@@ -1,146 +1,144 @@
 package syslog
 
-// SeverityMask is the bitmask representing the Severity in the Priority
-const SeverityMask = 0x07
-
-// FacilityMask is the bitmask representing the Facility in the Priority
-const FacilityMask = 0xf8
-
-// Severity represents the serverity part of the Syslog PRI header
-type Severity int
-
-// Facility represents the facility part of the Syslog PRI header
-type Facility int
-
-// Priority represents the Syslog PRI header
-type Priority int
-
-// Severities
-const (
-	Emergency Priority = iota // System is unusable
-	Alert                     // Action must be taken immediately
-	Crit                      // Critical conditions
-	Error                     // Error conditions
-	Warning                   // Warning conditions
-	Notice                    // Normal but significant conditions
-	Info                      // Informational messages
-	Debug                     // Debug-level messages
+import (
+	"errors"
+	"io"
+	"strconv"
+	"time"
 )
 
-// Facilities
-const (
-	Kern        Priority = iota << 3 // Kernel messages
-	User                             // User-level messages
-	Mail                             // Mail system
-	Daemon                           // System daemons
-	Auth                             // Security/authentication messages
-	Syslog                           // Messages generated internally by the syslog daemon
-	LPR                              // Printer subsystem
-	News                             // Network News subsystem
-	UUCP                             // UUCP subsystem
-	Cron                             // Cron subsystem
-	AuthPriv                         // Security/authentication messages
-	FTP                              // FTP daemon
-	NTP                              // NTP subsystem
-	Security                         // Log audit
-	Console                          // Log alert
-	SolarisCron                      // Scheduling daemon
-	Local0                           // Locally used facilities
-	Local1                           // Locally used facilities
-	Local2                           // Locally used facilities
-	Local3                           // Locally used facilities
-	Local4                           // Locally used facilities
-	Local5                           // Locally used facilities
-	Local6                           // Locally used facilities
-	Local7                           // Locally used facilities
+var (
+	ErrWrongFormat         = errors.New("log message does not conform the RFC5424 logging format")
+	ErrInvalidPrio         = errors.New("PRI header not a valid priority string")
+	ErrInvalidProtoVersion = errors.New("protocol version string invalid")
+	ErrInvalidTimestamp    = errors.New("timestamp does not conform the RFC5424 logging format")
 )
 
-// FacilityFromPrio extracts the Facility from a given Priority
-func FacilityFromPrio(p Priority) Facility {
-	return Facility(p >> 3)
-}
+// RFC5424Msg represents a log message in that matches RFC5424
+type RFC5424Msg struct{}
 
-// SeverityFromPrio extracts the Facility from a given Priority
-func SeverityFromPrio(p Priority) Severity {
-	return Severity(p & SeverityMask)
-}
-
-// FacilityStringFromPrio returns a string representation of the Facility of a given Priority
-func FacilityStringFromPrio(p Priority) string {
-	switch FacilityFromPrio(p) {
-	case 0:
-		return "KERN"
-	case 1:
-		return "USER"
-	case 2:
-		return "MAIL"
-	case 3:
-		return "DAEMON"
-	case 4:
-		return "AUTH"
-	case 5:
-		return "SYSLOG"
-	case 6:
-		return "LPR"
-	case 7:
-		return "NEWS"
-	case 8:
-		return "UUCP"
-	case 9:
-		return "CRON"
-	case 10:
-		return "AUTHPRIV"
-	case 11:
-		return "FTP"
-	case 12:
-		return "NTP"
-	case 13:
-		return "SECURITY"
-	case 14:
-		return "CONSOLE"
-	case 15:
-		return "SOLARISCRON"
-	case 16:
-		return "LOCAL0"
-	case 17:
-		return "LOCAL1"
-	case 18:
-		return "LOCAL2"
-	case 19:
-		return "LOCAL3"
-	case 20:
-		return "LOCAL4"
-	case 21:
-		return "LOCAL5"
-	case 22:
-		return "LOCAL6"
-	case 23:
-		return "LOCAL7"
-	default:
-		return "UNKNOWN"
+// ParseReader is the parser function that is able to interpret RFC5424 and
+// satisfies the Parser interface
+func (m *RFC5424Msg) ParseReader(r io.Reader) (LogMsg, error) {
+	l := LogMsg{
+		Type: RFC5424,
 	}
+	ml, err := readMsgLength(r)
+	if err != nil {
+		return l, err
+	}
+	lr := io.LimitReader(r, int64(ml))
+	if err := m.parseHeader(lr, &l); err != nil {
+		return l, err
+	}
+
+	return l, nil
 }
 
-// SeverityStringFromPrio returns a string representation of the Severity of a given Priority
-func SeverityStringFromPrio(p Priority) string {
-	switch SeverityFromPrio(p) {
-	case 0:
-		return "EMERGENCY"
-	case 1:
-		return "ALERT"
-	case 2:
-		return "CRIT"
-	case 3:
-		return "ERROR"
-	case 4:
-		return "WARNING"
-	case 5:
-		return "NOTICE"
-	case 6:
-		return "INFO"
-	case 7:
-		return "DEBUG"
-	default:
-		return "UNKNOWN"
+// parseHeader will try to parse the header of a RFC5424 syslog message and store
+// it in the provided LogMsg pointer
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
+func (m *RFC5424Msg) parseHeader(r io.Reader, lm *LogMsg) error {
+	if err := m.parsePriority(r, lm); err != nil {
+		return err
 	}
+	if err := m.parseProtoVersion(r, lm); err != nil {
+		return err
+	}
+	if err := m.parseTimestamp(r, lm); err != nil {
+		return err
+	}
+	if err := m.parseHostname(r, lm); err != nil {
+		return err
+	}
+	//fmt.Printf("%+v\n", lm)
+
+	return nil
+}
+
+// parsePriority will try to parse the priority part of the RFC54524 header
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
+func (m *RFC5424Msg) parsePriority(r io.Reader, lm *LogMsg) error {
+	var b [1]byte
+	var ps []byte
+	_, err := r.Read(b[:])
+	if err != nil {
+		return err
+	}
+	if b[0] != '<' {
+		return ErrWrongFormat
+	}
+	for {
+		_, err := r.Read(b[:])
+		if err != nil {
+			return err
+		}
+		if b[0] == '>' {
+			break
+		}
+		ps = append(ps, b[0])
+	}
+	p, err := strconv.Atoi(string(ps))
+	if err != nil {
+		return ErrInvalidPrio
+	}
+	lm.Priority = Priority(p)
+	lm.Facility = FacilityFromPrio(lm.Priority)
+	lm.Severity = SeverityFromPrio(lm.Priority)
+	return nil
+}
+
+// parseProtoVersion will try to parse the protocol version part of the RFC54524
+// header
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.2
+func (m *RFC5424Msg) parseProtoVersion(r io.Reader, lm *LogMsg) error {
+	b, _, err := readBytesUntilSpace(r)
+	if err != nil {
+		return err
+	}
+	pv, err := strconv.Atoi(string(b))
+	if err != nil {
+		return ErrInvalidProtoVersion
+	}
+	lm.ProtoVersion = ProtoVersion(pv)
+	return nil
+}
+
+// parseTimestamp will try to parse the timestamp (or NILVALUE) part of the
+// RFC54524 header
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.3
+func (m *RFC5424Msg) parseTimestamp(r io.Reader, lm *LogMsg) error {
+	b, _, err := readBytesUntilSpaceOrNilValue(r)
+	if err != nil {
+		return err
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	if b[0] == '-' {
+		return nil
+	}
+	ts, err := time.Parse(time.RFC3339, string(b))
+	if err != nil {
+		return ErrInvalidTimestamp
+	}
+	lm.Timestamp = ts
+	return nil
+}
+
+// parseHostname will try to read the hostname part of the RFC54524 header
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.4
+func (m *RFC5424Msg) parseHostname(r io.Reader, lm *LogMsg) error {
+	b, _, err := readBytesUntilSpaceOrNilValue(r)
+	if err != nil {
+		return err
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	if b[0] == '-' {
+		return nil
+	}
+	lm.Hostname = string(b)
+	return nil
 }
