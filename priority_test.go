@@ -44,6 +44,7 @@ func TestFacilityFromPrio(t *testing.T) {
 }
 
 // TestSeverityFromPrio tests the SeverityFromPrio method
+//nolint:staticcheck
 func TestSeverityFromPrio(t *testing.T) {
 	tests := []struct {
 		name string
@@ -110,6 +111,7 @@ func TestFacilityStringFromPrio(t *testing.T) {
 }
 
 // TestSeverityStringFromPrio tests the SeverityStringFromPrio method
+//nolint:staticcheck
 func TestSeverityStringFromPrio(t *testing.T) {
 	tests := []struct {
 		name string

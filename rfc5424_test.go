@@ -28,6 +28,7 @@ func TestRFC5424Msg_ParseReader(t *testing.T) {
 }
 
 // TestRFC5424Msg_parsePriority tests the parsePriority method of the RFC5424Msg parser
+//nolint:staticcheck
 func TestRFC5424Msg_parsePriority(t *testing.T) {
 	tests := []struct {
 		name         string
