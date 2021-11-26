@@ -1,5 +1,5 @@
-// Package syslog implements a syslog message parser for different RFC log formats
-package syslog
+// Package parsesyslog implements a syslog message parser for different RFC log formats
+package parsesyslog
 
 import "io"
 

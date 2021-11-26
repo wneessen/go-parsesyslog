@@ -10,7 +10,7 @@ import (
 
 func main() {
 	br := bufio.NewReader(os.Stdin)
-	m := syslog.RFC5424Msg{}
+	m := parsesyslog.RFC5424Msg{}
 	st := time.Now()
 	lm, err := m.ParseReader(br)
 	if err != nil {
@@ -20,7 +20,7 @@ func main() {
 	fmt.Println("Log message details:")
 	fmt.Println("+ Header:")
 	fmt.Printf("  - Priority:         %d (Facility: %s / Severity: %s)\n", lm.Priority,
-		syslog.FacilityStringFromPrio(lm.Priority), syslog.SeverityStringFromPrio(lm.Priority))
+		parsesyslog.FacilityStringFromPrio(lm.Priority), parsesyslog.SeverityStringFromPrio(lm.Priority))
 	fmt.Printf("  - Protocol Version: %d\n", lm.ProtoVersion)
 	fmt.Printf("  - Hostname:         %s\n", lm.Hostname)
 	fmt.Printf("  - AppName:          %s\n", lm.AppName)

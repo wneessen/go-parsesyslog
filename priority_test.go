@@ -1,4 +1,4 @@
-package syslog
+package parsesyslog
 
 import "testing"
 

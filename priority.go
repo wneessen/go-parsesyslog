@@ -1,4 +1,4 @@
-package syslog
+package parsesyslog
 
 // SeverityMask is the bitmask representing the Severity in the Priority
 const SeverityMask = 0x07
