@@ -30,19 +30,18 @@ func main() {
 	if len(lm.StructuredData) > 0 {
 		fmt.Println("+ Structured Data:")
 		for _, se := range lm.StructuredData {
-			fmt.Printf("  - ID:                %s\n", se.ID)
+			fmt.Printf("  - ID:               %s\n", se.ID)
 			pc := 0
 			for _, sp := range se.Param {
-				fmt.Printf("    + Param %d:                \n", pc)
-				fmt.Printf("      - Name:          %s\n", sp.Name)
-				fmt.Printf("      - Value:         %s\n", sp.Value)
+				fmt.Printf("    + Param %d:               \n", pc)
+				fmt.Printf("      - Name:         %s\n", sp.Name)
+				fmt.Printf("      - Value:        %s\n", sp.Value)
 				pc++
-
 			}
 		}
 	}
-	fmt.Printf("+ Message has BOM:     %t\n", lm.HasBOM)
-	fmt.Printf("+ Message Length:      %d\n", lm.MsgLength)
-	fmt.Printf("+ Message:             %s\n\n", string(lm.Message))
+	fmt.Printf("+ Message has BOM:    %t\n", lm.HasBOM)
+	fmt.Printf("+ Message Length:     %d\n", lm.MsgLength)
+	fmt.Printf("+ Message:            %s\n\n", string(lm.Message))
 	fmt.Printf("Log parsed in %s\n", et.String())
 }
