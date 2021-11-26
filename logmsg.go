@@ -10,15 +10,20 @@ const (
 
 // LogMsg represents a parsed syslog message
 type LogMsg struct {
-	Facility     Facility
-	Hostname     string
-	Message      []byte
-	MsgLength    int
-	Priority     Priority
-	ProtoVersion ProtoVersion
-	Severity     Severity
-	Timestamp    time.Time
-	Type         LogMsgType
+	AppName        string
+	Facility       Facility
+	HasBOM         bool
+	Hostname       string
+	Message        []byte
+	MsgLength      int
+	MsgID          string
+	Priority       Priority
+	ProcID         string
+	ProtoVersion   ProtoVersion
+	Severity       Severity
+	StructuredData []StructuredDataElement
+	Timestamp      time.Time
+	Type           LogMsgType
 }
 
 // LogMsgType represents the type of message
@@ -26,3 +31,19 @@ type LogMsgType string
 
 // ProtoVersion represents the version of message
 type ProtoVersion int
+
+// StructuredDataElement represents a structured data elements as defined in
+// RFC5424
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3.1
+type StructuredDataElement struct {
+	ID    string
+	Param []StructuredDataParam
+}
+
+// StructuredDataParam represents a structured data param pair as defined in
+// RFC5424
+// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3.3
+type StructuredDataParam struct {
+	Name  string
+	Value string
+}

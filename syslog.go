@@ -1,3 +1,4 @@
+// Package syslog implements a syslog message parser for different RFC log formats
 package syslog
 
 import "io"
