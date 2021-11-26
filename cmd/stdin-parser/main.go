@@ -18,6 +18,7 @@ func main() {
 	}
 	et := time.Since(st)
 	fmt.Println("Log message details:")
+	fmt.Printf("+ Log format:         %s\n", lm.Type)
 	fmt.Println("+ Header:")
 	fmt.Printf("  - Priority:         %d (Facility: %s / Severity: %s)\n", lm.Priority,
 		parsesyslog.FacilityStringFromPrio(lm.Priority), parsesyslog.SeverityStringFromPrio(lm.Priority))
