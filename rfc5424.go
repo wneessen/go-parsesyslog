@@ -14,7 +14,6 @@ var (
 	ErrInvalidProtoVersion = errors.New("protocol version string invalid")
 	ErrInvalidTimestamp    = errors.New("timestamp does not conform the RFC5424 logging format")
 	ErrWrongSDFormat       = errors.New("structured data does not conform the RFC5424 format")
-	ErrInvalidLength       = errors.New("provided length does not conform the RFC5424 format")
 	ErrPrematureEOF        = errors.New("log message is shorter than the provided length")
 )
 
@@ -29,7 +28,7 @@ func (m *RFC5424Msg) ParseReader(r io.Reader) (LogMsg, error) {
 	}
 	ml, err := readMsgLength(r)
 	if err != nil {
-		return l, ErrInvalidLength
+		return l, err
 	}
 	lr := io.LimitReader(r, int64(ml))
 	if err := m.parseHeader(lr, &l); err != nil {
@@ -54,7 +53,7 @@ func (m *RFC5424Msg) ParseReader(r io.Reader) (LogMsg, error) {
 	}
 	l.Message = append(l.Message, bb...)
 
-	md, err := io.ReadAll(r)
+	md, err := io.ReadAll(lr)
 	if err != nil {
 		switch {
 		case errors.Is(err, io.EOF):
