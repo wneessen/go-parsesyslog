@@ -22,7 +22,7 @@ type RFC5424Msg struct{}
 
 // ParseReader is the parser function that is able to interpret RFC5424 and
 // satisfies the Parser interface
-func (m *RFC5424Msg) ParseReader(r io.Reader) (LogMsg, error) {
+func (m *RFC5424Msg) parseReader(r io.Reader) (LogMsg, error) {
 	l := LogMsg{
 		Type: RFC5424,
 	}

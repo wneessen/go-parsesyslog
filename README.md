@@ -10,14 +10,14 @@
 
 ## Usage
 
-`go-parsesyslog` implements an `Interface` for various syslog formats, which makes it easy to extend. As
-long as the `Parser` interface is satisfied, `go-parsesyslog` will be able to work.
+`go-parsesyslog` implements an `Interface` for various syslog formats, which makes it easy to extend your own
+log parser. As long as the `Parser` interface is satisfied, `go-parsesyslog` will be able to work.
 
 The interface looks as following:
 
 ```go
 type Parser interface {
-	ParseReader(io.Reader) (LogMsg, error)
+	parseReader(io.Reader) (LogMsg, error)
 }
 ```
 
@@ -33,17 +33,14 @@ This example code show how to parse a RFC5424 conformant message:
 package main
 
 import (
-	"bufio"
 	"fmt"
-	parsesyslog "github.com/wneessen/go-parsesyslog"
-	"strings"
+	"github.com/wneessen/go-syslog"
 )
 
 func main() {
-	sr := strings.NewReader(`197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][foo@1234 foo="bar" blubb="bluh"] \xEF\xBB\xBFAn application event log entry..."`)
-	br := bufio.NewReader(sr)
-	m := parsesyslog.RFC5424Msg{}
-	lm, err := m.ParseReader(br)
+	msg := `197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][foo@1234 foo="bar" blubb="bluh"] \xEF\xBB\xBFAn application event log entry..."`
+	p := parsesyslog.NewRFC5424Parser()
+	lm, err := parsesyslog.ParseString(p, msg)
 	if err != nil {
 		panic(err)
 	}

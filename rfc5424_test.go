@@ -13,7 +13,7 @@ func TestRFC5424Msg_ParseReader(t *testing.T) {
 	sr := strings.NewReader(msg)
 	br := bufio.NewReader(sr)
 	m := &RFC5424Msg{}
-	l, err := m.ParseReader(br)
+	l, err := m.parseReader(br)
 	if err != nil {
 		t.Errorf("failed to parse log message: %s", err)
 		return
@@ -300,7 +300,7 @@ func BenchmarkRFC5424Msg_ParseReader(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		lm, err = m.ParseReader(br)
+		lm, err = m.parseReader(br)
 		if err != nil {
 			b.Errorf("failed to read bytes: %s", err)
 			break
