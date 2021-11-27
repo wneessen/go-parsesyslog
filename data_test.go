@@ -2,6 +2,7 @@ package parsesyslog
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -34,6 +35,41 @@ func Test_readBytesUntilSpace(t *testing.T) {
 			}
 			if got1 != tt.length {
 				t.Errorf("readBytesUntilSpace() got1 = %v, want %v", got1, tt.length)
+			}
+		})
+	}
+}
+
+// Test_readBytesUntilSpaceOrNilValue tests the readBytesUntilSpaceOrNilValue helper method
+func Test_readBytesUntilSpaceOrNilValue(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     string
+		bytes   []byte
+		length  int
+		wantErr bool
+	}{
+		{"test1", `123-test - blubb`, []byte("123-test"), 9, false},
+		{"timestamp", `2016-02-28T09:57:10.804642398-05:00 - - `,
+			[]byte("2016-02-28T09:57:10.804642398-05:00"), 36, false},
+		{"NILVAL", ` - foo bar`, []byte{}, 1, false},
+		{"empty", ``, []byte{}, 0, true},
+	}
+	var bb bytes.Buffer
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sr := strings.NewReader(tt.msg)
+			br := bufio.NewReader(sr)
+			got1, err := readBytesUntilSpaceOrNilValue(br, &bb)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readBytesUntilSpaceOrNilValue() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if bb.String() != string(tt.bytes) {
+				t.Errorf("readBytesUntilSpaceOrNilValue() got = %s, want %s", bb.String(), string(tt.bytes))
+			}
+			if got1 != tt.length {
+				t.Errorf("readBytesUntilSpaceOrNilValue() got1 = %d, want %d", got1, tt.length)
 			}
 		})
 	}

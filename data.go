@@ -1,60 +1,69 @@
 package parsesyslog
 
 import (
-	"io"
-	"strconv"
+	"bufio"
+	"bytes"
+	"fmt"
+	"math"
 )
 
 // readMsgLength reads the first bytes of the log message which represent the total length of
 // the log message
-func readMsgLength(r io.Reader) (int, error) {
+func readMsgLength(r *bufio.Reader) (int, error) {
 	ls, _, err := readBytesUntilSpace(r)
 	if err != nil {
 		return 0, err
 	}
-	ml, err := strconv.Atoi(string(ls))
-	return ml, err
+	return atoi(ls)
+}
+
+// atoi performs allocation free ASCII number to integer conversion
+func atoi(b []byte) (int, error) {
+	z := 0
+	c := 0
+	for x := len(b); x > 0; x-- {
+		y := int(b[x-1]) - 0x30
+		if y > 10 {
+			return 0, fmt.Errorf("not a number: %s", string(b[x-1]))
+		}
+		z += y * int(math.Pow10(c))
+		c++
+	}
+	return z, nil
 }
 
 // readBytesUntilSpace is a helper method that takes a io.Reader and reads all bytes until it hits
 // a Space character. It returns the read bytes, the amount of bytes read and an error if one
 // occured
-func readBytesUntilSpace(r io.Reader) ([]byte, int, error) {
-	var buf []byte
-	var b [1]byte
-	tb := 0
-	for {
-		n, err := r.Read(b[:])
-		if err != nil {
-			return buf, tb, err
-		}
-		tb += n
-		if b[0] == ' ' {
-			return buf, tb, nil
-		}
-		buf = append(buf, b[0])
+func readBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
+	buf, err := r.ReadSlice(' ')
+	if err != nil {
+		return buf, len(buf), err
 	}
+	if len(buf) > 0 {
+		return buf[:len(buf)-1], len(buf), nil
+	}
+	return buf, len(buf), nil
 }
 
 // readBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
 // it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
 // and an error if one occured
-func readBytesUntilSpaceOrNilValue(r io.Reader) ([]byte, int, error) {
-	var buf []byte
-	var b [1]byte
+func readBytesUntilSpaceOrNilValue(r *bufio.Reader, buf *bytes.Buffer) (int, error) {
+	buf.Reset()
 	tb := 0
 	for {
-		n, err := r.Read(b[:])
+		b, err := r.ReadByte()
 		if err != nil {
-			return buf, tb, err
+			return tb, err
 		}
-		tb += n
-		if b[0] == ' ' {
-			return buf, tb, nil
+		tb++
+		if b == ' ' {
+			return tb, nil
 		}
-		if b[0] == '-' && (len(buf) > 0 && buf[tb-2] == ' ') {
-			return buf, tb, nil
+		if b == '-' && (buf.Len() > 0 && buf.Bytes()[tb-2] == ' ') {
+			return tb, nil
 		}
-		buf = append(buf, b[0])
+		buf.WriteByte(b)
 	}
 }

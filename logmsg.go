@@ -1,6 +1,9 @@
 package parsesyslog
 
-import "time"
+import (
+	"bytes"
+	"time"
+)
 
 // LogMsgTypes
 const (
@@ -10,11 +13,12 @@ const (
 
 // LogMsg represents a parsed syslog message
 type LogMsg struct {
-	AppName        string
-	Facility       Facility
-	HasBOM         bool
-	Hostname       string
-	Message        []byte
+	AppName  string
+	Facility Facility
+	HasBOM   bool
+	Hostname string
+	//Message        []byte
+	Message        bytes.Buffer
 	MsgLength      int
 	MsgID          string
 	Priority       Priority

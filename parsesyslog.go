@@ -17,6 +17,14 @@ func NewRFC5424Parser() *RFC5424Msg {
 	return &RFC5424Msg{}
 }
 
+/*
+// NewRFC3164Parser returns a new Parser for RFC3164 messages
+func NewRFC3164Parser() *RFC3164Msg {
+	return &RFC3164Msg{}
+}
+
+*/
+
 // ParseReader returns the parsed log message based on the given parser
 // interface read from the io.Reader
 func ParseReader(p Parser, r io.Reader) (LogMsg, error) {

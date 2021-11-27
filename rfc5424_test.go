@@ -21,9 +21,9 @@ func TestRFC5424Msg_ParseReader(t *testing.T) {
 	if l.MsgLength <= 0 {
 		t.Error("failed to parse log message: empty message returned")
 	}
-	if len(l.Message) != l.MsgLength {
+	if l.Message.Len() != l.MsgLength {
 		t.Errorf("failed to parse log message: returned message does not match retured length => msg: %d, l: %d",
-			len(l.Message), l.MsgLength)
+			l.Message.Len(), l.MsgLength)
 	}
 }
 
