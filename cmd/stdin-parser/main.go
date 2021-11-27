@@ -10,9 +10,9 @@ import (
 
 func main() {
 	br := bufio.NewReader(os.Stdin)
-	m := parsesyslog.RFC5424Msg{}
+	p := parsesyslog.NewRFC5424Parser()
 	st := time.Now()
-	lm, err := m.ParseReader(br)
+	lm, err := parsesyslog.ParseReader(p, br)
 	if err != nil {
 		panic(err)
 	}
