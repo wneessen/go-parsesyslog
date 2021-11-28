@@ -4,8 +4,6 @@
 
 ## Supported formats
 
-`go-parsesyslog` fully support the following syslog formats:
-
 ### BSD syslog format (RFC3164)
 
 `go-parsesyslog` fully implements the [RFC3164](https://datatracker.ietf.org/doc/html/rfc3164) format including
@@ -14,7 +12,8 @@ timestamp parsing and optional tags.
 **Please note**: the RFC is not providing any message length definition and explicity states that there
 is "[no ending delimiter to this part](https://tools.ietf.org/search/rfc3164#section-4.1.3)"
 for this reason we are using the newline (`\n` (ASCII: 10)) as delimiter. This will therefore truncate messages that
-have a newline in it.
+have a newline in it. Additionally the RFC does specify a timestamp format that has not provide any information about
+the year. For this reason, we will interpret the year for the message as the current year.
 
 Available fields in the `LogMsg`:
 
@@ -31,19 +30,25 @@ Available fields in the `LogMsg`:
 * `MsgLength`: The length of the `Message` (not including any header part)
 * `Type`: This will be always set to `RFC3164`
 
-### IETF-syslog 
-`go-parsesyslog` is also fully ([RFC5424](https://datatracker.ietf.org/doc/html/rfc5424)) compliant. All available 
-fields are parsed and represented accordingly in the `LogMsg` fields. Although the RFC5424 mandates a maximum length
-of 2048 bytes for a log message, `go-parsesyslog` does only obey the message length given in the header of the 
-message.
+### IETF-syslog
+
+`go-parsesyslog` is also fully ([RFC5424](https://datatracker.ietf.org/doc/html/rfc5424)) compliant. All available
+fields are parsed and represented accordingly in the `LogMsg` fields. Although the RFC5424 mandates a maximum length of
+2048 bytes for a log message, `go-parsesyslog` does only obey the message length given in the header of the message.
 
 Available fields in the `LogMsg`:
+
 * `Priority`: this represents the [PRI](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1) field of the header
-* `ProtoVersion`: this represents the [VERSION](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.2) field of the header
-* `Timestamp`: this represents the [TIMESTAMP](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.3) field of the header
-* `Hostname`: this represents the [HOSTNAME](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.4) field of the header
-* `AppName`: this represents the [APP-NAME](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.5) field of the header
-* `ProcID`: this represents the [PROCID](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.6) field of the header
+* `ProtoVersion`: this represents the [VERSION](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.2) field of
+  the header
+* `Timestamp`: this represents the [TIMESTAMP](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.3) field of the
+  header
+* `Hostname`: this represents the [HOSTNAME](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.4) field of the
+  header
+* `AppName`: this represents the [APP-NAME](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.5) field of the
+  header
+* `ProcID`: this represents the [PROCID](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.6) field of the
+  header
 * `MsgID`: this represents the [MSGID](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.7) field of the header
 * `StructuredData` this represents fully parsed structured data as described in
   the [STRUCTURED-DATA](https://datatracker.ietf.org/doc/html/rfc5424#section-6.3) section of the RFC
@@ -63,7 +68,7 @@ The interface looks as following:
 
 ```go
 type Parser interface {
-parseReader(io.Reader) (LogMsg, error)
+	parseReader(io.Reader) (LogMsg, error)
 }
 ```
 
@@ -125,6 +130,7 @@ $ $ echo -ne '197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog
 ```
 
 This command will output:
+
 ```
 Log message details:
 + Log format:         RFC5424
@@ -162,9 +168,10 @@ Log parsed in 18.745µs
 ```
 
 ## Benchmark
-As the main intention of this library was for me to use it in a network service that parses incoming syslog
-messages, quite some work has been invested to make `go-parsesyslog` fast and memory efficient. We are trying
-to allocate as less as possible and make use of buffered I/O where possible.
+
+As the main intention of this library was for me to use it in a network service that parses incoming syslog messages,
+quite some work has been invested to make `go-parsesyslog` fast and memory efficient. We are trying to allocate as less
+as possible and make use of buffered I/O where possible.
 
 ```shell
 $ go test -run=X -bench=.\*ParseReader -benchtime=5s
