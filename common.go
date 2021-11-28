@@ -19,7 +19,7 @@ func readMsgLength(r *bufio.Reader) (int, error) {
 
 // readBytesUntilSpace is a helper method that takes a io.Reader and reads all bytes until it hits
 // a Space character. It returns the read bytes, the amount of bytes read and an error if one
-// occured
+// occurred
 func readBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
 	buf, err := r.ReadSlice(' ')
 	if err != nil {
@@ -33,7 +33,7 @@ func readBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
 
 // readBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
 // it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
-// and an error if one occured
+// and an error if one occurred
 func readBytesUntilSpaceOrNilValue(r *bufio.Reader, buf *bytes.Buffer) (int, error) {
 	buf.Reset()
 	tb := 0
