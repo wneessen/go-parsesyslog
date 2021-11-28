@@ -1,4 +1,4 @@
-# go-parsesyslog - a Go library to parse syslog message
+# go-parsesyslog - a Go library to parse syslog messages
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/wneessen/go-syslog.svg)](https://pkg.go.dev/github.com/wneessen/go-syslog) [![Go Report Card](https://goreportcard.com/badge/github.com/wneessen/go-syslog)](https://goreportcard.com/report/github.com/wneessen/go-syslog) [![Build Status](https://api.cirrus-ci.com/github/wneessen/go-parsesyslog.svg)](https://cirrus-ci.com/github/wneessen/go-parsesyslog) <a href="https://ko-fi.com/D1D24V9IX"><img src="https://uploads-ssl.webflow.com/5c14e387dab576fe667689cf/5cbed8a4ae2b88347c06c923_BuyMeACoffee_blue.png" height="20" alt="buy ma a coffee"></a>
 
