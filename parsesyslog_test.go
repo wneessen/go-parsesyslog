@@ -97,7 +97,6 @@ func TestParseReaderRFC5424(t *testing.T) {
 
 // TestParseStringRFC3164 tests the NewRFC3164Parser method together with the ParseString
 // method (which implies ParseReader as well)
-/*
 func TestParseStringRFC3164(t *testing.T) {
 	p := NewRFC3164Parser()
 	if p == nil {
@@ -109,8 +108,8 @@ func TestParseStringRFC3164(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse message: %s", err)
 	}
-	if l.MsgLength != 4 {
-		t.Errorf("ParseString() wrong msg length => expected: %d, got: %d", 4, l.MsgLength)
+	if l.MsgLength != 5 {
+		t.Errorf("ParseString() wrong msg length => expected: %d, got: %d", 5, l.MsgLength)
 	}
 	if l.MsgID != "" {
 		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
@@ -118,8 +117,8 @@ func TestParseStringRFC3164(t *testing.T) {
 	if l.ProcID != "1130275" {
 		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "1130275", l.ProcID)
 	}
-	if string(l.Message) != `test` {
-		t.Errorf("ParseString() wrong message => expected: %q, got: %q", `test`, string(l.Message))
+	if l.Message.String() != "test\n" {
+		t.Errorf("ParseString() wrong message => expected: %q, got: %q", "test\n", l.Message.String())
 	}
 	if l.Priority != 13 {
 		t.Errorf("ParseString() wrong priority => expected: %d, got: %d", 13, l.Priority)
@@ -135,8 +134,6 @@ func TestParseStringRFC3164(t *testing.T) {
 			l.Timestamp.UTC().Format("01-02 15:04:05"))
 	}
 }
-
-*/
 
 // BenchmarkParseStringRFC5424 benchmarks the ParseReader method of the RFC5424Msg type
 func BenchmarkParseStringRFC5424(b *testing.B) {
@@ -161,7 +158,6 @@ func BenchmarkParseStringRFC5424(b *testing.B) {
 	_ = lm
 }
 
-/*
 // BenchmarkParseStringRFC3164 benchmarks the ParseReader method of the RFC3164Msg type
 func BenchmarkParseStringRFC3164(b *testing.B) {
 	b.ReportAllocs()
@@ -185,4 +181,3 @@ func BenchmarkParseStringRFC3164(b *testing.B) {
 	}
 	_ = lm
 }
-*/

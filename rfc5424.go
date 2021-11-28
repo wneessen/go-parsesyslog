@@ -67,7 +67,7 @@ func (m *RFC5424Msg) parseReader(r io.Reader) (LogMsg, error) {
 // it in the provided LogMsg pointer
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
 func (m *RFC5424Msg) parseHeader(r *bufio.Reader, lm *LogMsg) error {
-	if err := m.parsePriority(r, lm); err != nil {
+	if err := parsePriority(r, &m.buf, lm); err != nil {
 		return err
 	}
 	if err := m.parseProtoVersion(r, lm); err != nil {
@@ -183,38 +183,6 @@ func (m *RFC5424Msg) parseBOM(r *bufio.Reader, lm *LogMsg) error {
 	if bytes.Equal(bom, []byte{0xEF, 0xBB, 0xBF}) {
 		lm.HasBOM = true
 	}
-	return nil
-}
-
-// parsePriority will try to parse the priority part of the RFC54524 header
-// See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
-func (m *RFC5424Msg) parsePriority(r *bufio.Reader, lm *LogMsg) error {
-	var b [1]byte
-	var ps []byte
-	_, err := r.Read(b[:])
-	if err != nil {
-		return err
-	}
-	if b[0] != '<' {
-		return ErrWrongFormat
-	}
-	for {
-		_, err := r.Read(b[:])
-		if err != nil {
-			return err
-		}
-		if b[0] == '>' {
-			break
-		}
-		ps = append(ps, b[0])
-	}
-	p, err := atoi(ps)
-	if err != nil {
-		return ErrInvalidPrio
-	}
-	lm.Priority = Priority(p)
-	lm.Facility = FacilityFromPrio(lm.Priority)
-	lm.Severity = SeverityFromPrio(lm.Priority)
 	return nil
 }
 

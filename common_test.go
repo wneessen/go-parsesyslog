@@ -104,6 +104,43 @@ func Test_readMsgLength(t *testing.T) {
 	}
 }
 
+// Test_parsePriority tests the parsePriority method
+//nolint:staticcheck
+func Test_parsePriority(t *testing.T) {
+	tests := []struct {
+		name         string
+		msg          string
+		wantPrio     Priority
+		wantFacility Facility
+		wantSeverity Severity
+		wantErr      bool
+	}{
+		{"Syslog/Notice is 5 and 5", `<45>1`, Syslog | Notice, 5, 5, false},
+		{"Kern/Emergency is 0 and 0", `<0>1`, Kern | Emergency, 0, 0, false},
+		{"Mail/Alert is 2 and 1", `<17>1`, Mail | Alert, 2, 1, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sr := strings.NewReader(tt.msg)
+			br := bufio.NewReader(sr)
+			m := &RFC5424Msg{}
+			lm := &LogMsg{}
+			if err := parsePriority(br, &m.buf, lm); (err != nil) != tt.wantErr {
+				t.Errorf("parseHeader() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if lm.Priority != tt.wantPrio {
+				t.Errorf("parseHeader() wrong prio = want: %d, got: %d", tt.wantPrio, lm.Priority)
+			}
+			if lm.Facility != tt.wantFacility {
+				t.Errorf("parseHeader() wrong facility = want: %d, got: %d", tt.wantFacility, lm.Facility)
+			}
+			if lm.Severity != tt.wantSeverity {
+				t.Errorf("parseHeader() wrong severity = want: %d, got: %d", tt.wantSeverity, lm.Severity)
+			}
+		})
+	}
+}
+
 // Benchmark_readBytesUntilSpace benchmarks the readBytesUntilSpace helper method
 func Benchmark_readBytesUntilSpace(b *testing.B) {
 	b.ReportAllocs()

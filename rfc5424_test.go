@@ -27,43 +27,6 @@ func TestRFC5424Msg_ParseReader(t *testing.T) {
 	}
 }
 
-// TestRFC5424Msg_parsePriority tests the parsePriority method of the RFC5424Msg parser
-//nolint:staticcheck
-func TestRFC5424Msg_parsePriority(t *testing.T) {
-	tests := []struct {
-		name         string
-		msg          string
-		wantPrio     Priority
-		wantFacility Facility
-		wantSeverity Severity
-		wantErr      bool
-	}{
-		{"Syslog/Notice is 5 and 5", `<45>1`, Syslog | Notice, 5, 5, false},
-		{"Kern/Emergency is 0 and 0", `<0>1`, Kern | Emergency, 0, 0, false},
-		{"Mail/Alert is 2 and 1", `<17>1`, Mail | Alert, 2, 1, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sr := strings.NewReader(tt.msg)
-			br := bufio.NewReader(sr)
-			m := &RFC5424Msg{}
-			lm := &LogMsg{}
-			if err := m.parsePriority(br, lm); (err != nil) != tt.wantErr {
-				t.Errorf("parseHeader() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if lm.Priority != tt.wantPrio {
-				t.Errorf("parseHeader() wrong prio = want: %d, got: %d", tt.wantPrio, lm.Priority)
-			}
-			if lm.Facility != tt.wantFacility {
-				t.Errorf("parseHeader() wrong facility = want: %d, got: %d", tt.wantFacility, lm.Facility)
-			}
-			if lm.Severity != tt.wantSeverity {
-				t.Errorf("parseHeader() wrong severity = want: %d, got: %d", tt.wantSeverity, lm.Severity)
-			}
-		})
-	}
-}
-
 // TestRFC5424Msg_parseTimestamp tests the parseTimestamp method of the RFC5424Msg parser
 func TestRFC5424Msg_parseTimestamp(t *testing.T) {
 	tf := `2006-01-02 15:04:05.000 -07`
