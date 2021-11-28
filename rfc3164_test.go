@@ -62,7 +62,7 @@ func TestRFC3164Msg_ParseReader(t *testing.T) {
 // BenchmarkRFC3164Msg_ParseReader benchmarks the ParseReader method of the RFC3164Msg type
 func BenchmarkRFC3164Msg_ParseReader(b *testing.B) {
 	b.ReportAllocs()
-	sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8")
+	sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n")
 	br := bufio.NewReader(sr)
 	m := RFC3164Msg{}
 	var lm LogMsg

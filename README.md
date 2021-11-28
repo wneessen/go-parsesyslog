@@ -1,6 +1,6 @@
-# go-parsesyslog
+# go-parsesyslog - a Go library to parse syslog message
 
-`go-parsesyslog` implements a Go library to parse syslog message
+[![Go Reference](https://pkg.go.dev/badge/github.com/wneessen/go-syslog.svg)](https://pkg.go.dev/github.com/wneessen/go-syslog) [![Go Report Card](https://goreportcard.com/badge/github.com/wneessen/go-syslog)](https://goreportcard.com/report/github.com/wneessen/go-syslog) [![Build Status](https://api.cirrus-ci.com/github/wneessen/go-parsesyslog.svg)](https://cirrus-ci.com/github/wneessen/go-parsesyslog) <a href="https://ko-fi.com/D1D24V9IX"><img src="https://uploads-ssl.webflow.com/5c14e387dab576fe667689cf/5cbed8a4ae2b88347c06c923_BuyMeACoffee_blue.png" height="20" alt="buy ma a coffee"></a>
 
 ## Supported formats
 
@@ -159,4 +159,20 @@ Log message details:
 + Message:            An application event l
 
 Log parsed in 18.745µs
+```
+
+## Benchmark
+As the main intention of this library was for me to use it in a network service that parses incoming syslog
+messages, quite some work has been invested to make `go-parsesyslog` fast and memory efficient. We are trying
+to allocate as less as possible and make use of buffered I/O where possible.
+
+```shell
+$ go test -run=X -bench=.\*ParseReader -benchtime=5s
+goos: linux
+goarch: amd64
+pkg: github.com/wneessen/go-syslog
+cpu: AMD Ryzen 9 3950X 16-Core Processor
+BenchmarkRFC3164Msg_ParseReader-2        7575034               796.4 ns/op            96 B/op          4 allocs/op
+BenchmarkRFC5424Msg_ParseReader-2        3576459              1703 ns/op            1144 B/op         16 allocs/op
+PASS
 ```
