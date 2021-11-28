@@ -43,6 +43,6 @@ func main() {
 	}
 	fmt.Printf("+ Message has BOM:    %t\n", lm.HasBOM)
 	fmt.Printf("+ Message Length:     %d\n", lm.MsgLength)
-	fmt.Printf("+ Message:            %s\n\n", string(lm.Message))
+	fmt.Printf("+ Message:            %s\n\n", lm.Message.String())
 	fmt.Printf("Log parsed in %s\n", et.String())
 }

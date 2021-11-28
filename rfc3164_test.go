@@ -48,8 +48,7 @@ func TestRFC3164Msg_parseTag(t *testing.T) {
 
 // TestRFC3164Msg_ParseReader tests the ParseReader method of the RFC3164Msg type
 func TestRFC3164Msg_ParseReader(t *testing.T) {
-	//sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8")
-	sr := strings.NewReader("<46>Nov 28 09:05:40 arch-vm -- MARK --\n<46>Nov 28 09:05:40 arch-vm -- MARK --\n<46>Nov 28 09:05:40 arch-vm -- MARK --\n<46>Nov 28 09:05:40 arch-vm -- MARK --\n")
+	sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8")
 	br := bufio.NewReader(sr)
 	m := RFC3164Msg{}
 
