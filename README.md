@@ -33,7 +33,7 @@ Available fields in the `LogMsg`:
 
 ### IETF-syslog 
 `go-parsesyslog` is also fully ([RFC5424](https://datatracker.ietf.org/doc/html/rfc5424)) compliant. All available 
-fields are parsed and represented accordingly in the `LogMsg` fields. Also the RFC5424 mandates a maximum length
+fields are parsed and represented accordingly in the `LogMsg` fields. Although the RFC5424 mandates a maximum length
 of 2048 bytes for a log message, `go-parsesyslog` does only obey the message length given in the header of the 
 message.
 
