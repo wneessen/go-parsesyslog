@@ -68,8 +68,8 @@ The interface looks as following:
 
 ```go
 type Parser interface {
-	ParseReader(io.Reader) (LogMsg, error)
-    ParseString(string) (LogMsg, error)
+  ParseReader(io.Reader) (LogMsg, error)
+  ParseString(string) (LogMsg, error)
 }
 ```
 
@@ -86,24 +86,24 @@ This example code show how to parse a RFC5424 conformant message:
 package main
 
 import (
-  "fmt"
-  "github.com/wneessen/go-parsesyslog"
-  "github.com/wneessen/go-parsesyslog/rfc3164"
-  "os"
+	"fmt"
+	"github.com/wneessen/go-parsesyslog"
+	"github.com/wneessen/go-parsesyslog/rfc3164"
+	"os"
 )
 
 func main() {
-  msg := "<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n"
-  p, err := parsesyslog.New(rfc3164.Type)
-  if err != nil {
-	  fmt.Printf("failed to create RFC3164 parser: %s", err)
-	  os.Exit(1)
-  }
-  lm, err := p.ParseString(msg)
-  if err != nil {
-    panic(err)
-  }
-  fmt.Printf("Log message: %+v", lm)
+	msg := "<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n"
+	p, err := parsesyslog.New(rfc3164.Type)
+	if err != nil {
+		fmt.Printf("failed to create RFC3164 parser: %s", err)
+		os.Exit(1)
+	}
+	lm, err := p.ParseString(msg)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Log message: %+v", lm)
 }
 ```
 
@@ -117,17 +117,17 @@ package main
 import (
 	"fmt"
 	"github.com/wneessen/go-parsesyslog"
-    "github.com/wneessen/go-parsesyslog/rfc5424"
+	"github.com/wneessen/go-parsesyslog/rfc5424"
 	"os"
 )
 
 func main() {
 	msg := `197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][foo@1234 foo="bar" blubb="bluh"] \xEF\xBB\xBFAn application event log entry..."`
 	p, err := parsesyslog.New(rfc5424.Type)
-    if err != nil {
-        fmt.Printf("failed to create RFC3164 parser: %s", err)
-        os.Exit(1)
-    }
+	if err != nil {
+		fmt.Printf("failed to create RFC3164 parser: %s", err)
+		os.Exit(1)
+	}
 	lm, err := p.ParseString(msg)
 	if err != nil {
 		panic(err)
