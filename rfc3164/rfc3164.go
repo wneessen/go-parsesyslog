@@ -21,7 +21,7 @@ type msg struct {
 // Type represents the ParserType for this Parser
 const Type parsesyslog.ParserType = "rfc3164"
 
-// init registeres the Parser
+// init registers the Parser
 func init() {
 	fn := func() (parsesyslog.Parser, error) {
 		return &msg{}, nil
