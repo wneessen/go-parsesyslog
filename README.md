@@ -1,6 +1,6 @@
 # go-parsesyslog - a Go library to parse syslog messages
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/wneessen/go-syslog.svg)](https://pkg.go.dev/github.com/wneessen/go-syslog) [![Go Report Card](https://goreportcard.com/badge/github.com/wneessen/go-syslog)](https://goreportcard.com/report/github.com/wneessen/go-syslog) [![Build Status](https://api.cirrus-ci.com/github/wneessen/go-parsesyslog.svg)](https://cirrus-ci.com/github/wneessen/go-parsesyslog) <a href="https://ko-fi.com/D1D24V9IX"><img src="https://uploads-ssl.webflow.com/5c14e387dab576fe667689cf/5cbed8a4ae2b88347c06c923_BuyMeACoffee_blue.png" height="20" alt="buy ma a coffee"></a>
+[![Go Reference](https://pkg.go.dev/badge/github.com/wneessen/go-parsesyslog.svg)](https://pkg.go.dev/github.com/wneessen/go-parsesyslog) [![Go Report Card](https://goreportcard.com/badge/github.com/wneessen/go-parsesyslog)](https://goreportcard.com/report/github.com/wneessen/go-parsesyslog) [![Build Status](https://api.cirrus-ci.com/github/wneessen/go-parsesyslog.svg)](https://cirrus-ci.com/github/wneessen/go-parsesyslog) <a href="https://ko-fi.com/D1D24V9IX"><img src="https://uploads-ssl.webflow.com/5c14e387dab576fe667689cf/5cbed8a4ae2b88347c06c923_BuyMeACoffee_blue.png" height="20" alt="buy ma a coffee"></a>
 
 ## Supported formats
 
@@ -68,7 +68,8 @@ The interface looks as following:
 
 ```go
 type Parser interface {
-	parseReader(io.Reader) (LogMsg, error)
+	ParseReader(io.Reader) (LogMsg, error)
+    ParseString(string) (LogMsg, error)
 }
 ```
 
@@ -85,18 +86,24 @@ This example code show how to parse a RFC5424 conformant message:
 package main
 
 import (
-	"fmt"
-	"github.com/wneessen/go-syslog"
+  "fmt"
+  "github.com/wneessen/go-parsesyslog"
+  "github.com/wneessen/go-parsesyslog/rfc3164"
+  "os"
 )
 
 func main() {
-	msg := "<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n"
-	p := parsesyslog.NewRFC3164Parser()
-	lm, err := parsesyslog.ParseString(p, msg)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Log message: %+v", lm)
+  msg := "<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n"
+  p, err := parsesyslog.New(rfc3164.Type)
+  if err != nil {
+	  fmt.Printf("failed to create RFC3164 parser: %s", err)
+	  os.Exit(1)
+  }
+  lm, err := p.ParseString(msg)
+  if err != nil {
+    panic(err)
+  }
+  fmt.Printf("Log message: %+v", lm)
 }
 ```
 
@@ -109,13 +116,19 @@ package main
 
 import (
 	"fmt"
-	"github.com/wneessen/go-syslog"
+	"github.com/wneessen/go-parsesyslog"
+    "github.com/wneessen/go-parsesyslog/rfc5424"
+	"os"
 )
 
 func main() {
 	msg := `197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][foo@1234 foo="bar" blubb="bluh"] \xEF\xBB\xBFAn application event log entry..."`
-	p := parsesyslog.NewRFC5424Parser()
-	lm, err := parsesyslog.ParseString(p, msg)
+	p, err := parsesyslog.New(rfc5424.Type)
+    if err != nil {
+        fmt.Printf("failed to create RFC3164 parser: %s", err)
+        os.Exit(1)
+    }
+	lm, err := p.ParseString(msg)
 	if err != nil {
 		panic(err)
 	}
@@ -126,7 +139,7 @@ func main() {
 An example implementation can be found in [cmd/stdin-parser](cmd/stdin-parser)
 
 ```shell
-$ $ echo -ne '197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][foo@1234 foo="bar" blubb="bluh"] \xEF\xBB\xBFAn application event log entry...' | go run github.com/wneessen/go-syslog/cmd/stdin-parser
+$ $ echo -ne '197 <165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][foo@1234 foo="bar" blubb="bluh"] \xEF\xBB\xBFAn application event log entry...' | go run github.com/wneessen/go-parsesyslog/cmd/stdin-parser
 ```
 
 This command will output:
@@ -174,12 +187,12 @@ quite some work has been invested to make `go-parsesyslog` fast and memory effic
 as possible and make use of buffered I/O where possible.
 
 ```shell
-$ go test -run=X -bench=.\*ParseReader -benchtime=5s
+$ go test -run=X -bench=.\*ParseReader -benchtime=5s ./...
 goos: linux
 goarch: amd64
-pkg: github.com/wneessen/go-syslog
+pkg: github.com/wneessen/go-parsesyslog
 cpu: AMD Ryzen 9 3950X 16-Core Processor
-BenchmarkRFC3164Msg_ParseReader-2        7575034               796.4 ns/op            96 B/op          4 allocs/op
-BenchmarkRFC5424Msg_ParseReader-2        3576459              1703 ns/op            1144 B/op         16 allocs/op
+BenchmarkRFC3164Msg_ParseReader-2        7971660               748.9 ns/op            96 B/op          4 allocs/op
+BenchmarkRFC5424Msg_ParseReader-2        3458671              1734 ns/op            1144 B/op         16 allocs/op
 PASS
 ```
