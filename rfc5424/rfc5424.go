@@ -1,30 +1,50 @@
-package parsesyslog
+package rfc5424
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
+	"github.com/wneessen/go-parsesyslog"
 	"io"
+	"strings"
 	"time"
 )
 
-// RFC5424Msg represents a log message in that matches RFC5424
-type RFC5424Msg struct {
+// msg represents a log message in that matches RFC5424
+type msg struct {
 	buf bytes.Buffer
+}
+
+// Type represents the ParserType for this Parser
+const Type parsesyslog.ParserType = "rfc5424"
+
+// init registeres the Parser
+func init() {
+	fn := func() (parsesyslog.Parser, error) {
+		return &msg{}, nil
+	}
+	parsesyslog.Register(Type, fn)
+}
+
+// ParseString returns the parsed log message read from a string (as buffered i/o)
+func (m *msg) ParseString(s string) (parsesyslog.LogMsg, error) {
+	sr := strings.NewReader(s)
+	br := bufio.NewReader(sr)
+	return m.ParseReader(br)
 }
 
 // ParseReader is the parser function that is able to interpret RFC5424 and
 // satisfies the Parser interface
-func (m *RFC5424Msg) parseReader(r io.Reader) (LogMsg, error) {
-	l := LogMsg{
-		Type: RFC5424,
+func (m *msg) ParseReader(r io.Reader) (parsesyslog.LogMsg, error) {
+	l := parsesyslog.LogMsg{
+		Type: parsesyslog.RFC5424,
 	}
 
 	br, ok := r.(*bufio.Reader)
 	if !ok {
 		br = bufio.NewReader(r)
 	}
-	ml, err := readMsgLength(br)
+	ml, err := parsesyslog.ReadMsgLength(br)
 	if err != nil {
 		return l, err
 	}
@@ -34,7 +54,7 @@ func (m *RFC5424Msg) parseReader(r io.Reader) (LogMsg, error) {
 	if err := m.parseHeader(br, &l); err != nil {
 		switch {
 		case errors.Is(err, io.EOF):
-			return l, ErrPrematureEOF
+			return l, parsesyslog.ErrPrematureEOF
 		default:
 			return l, err
 		}
@@ -42,7 +62,7 @@ func (m *RFC5424Msg) parseReader(r io.Reader) (LogMsg, error) {
 	if err := m.parseStructuredData(br, &l); err != nil {
 		switch {
 		case errors.Is(err, io.EOF):
-			return l, ErrPrematureEOF
+			return l, parsesyslog.ErrPrematureEOF
 		default:
 			return l, err
 		}
@@ -66,8 +86,8 @@ func (m *RFC5424Msg) parseReader(r io.Reader) (LogMsg, error) {
 // parseHeader will try to parse the header of a RFC5424 syslog message and store
 // it in the provided LogMsg pointer
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
-func (m *RFC5424Msg) parseHeader(r *bufio.Reader, lm *LogMsg) error {
-	if err := parsePriority(r, &m.buf, lm); err != nil {
+func (m *msg) parseHeader(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	if err := parsesyslog.ParsePriority(r, &m.buf, lm); err != nil {
 		return err
 	}
 	if err := m.parseProtoVersion(r, lm); err != nil {
@@ -97,7 +117,7 @@ func (m *RFC5424Msg) parseHeader(r *bufio.Reader, lm *LogMsg) error {
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
 // We are using a simple finite state machine here to parse through the different
 // states of the parameters and elements
-func (m *RFC5424Msg) parseStructuredData(r *bufio.Reader, lm *LogMsg) error {
+func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	m.buf.Reset()
 
 	nb, err := r.ReadByte()
@@ -112,12 +132,12 @@ func (m *RFC5424Msg) parseStructuredData(r *bufio.Reader, lm *LogMsg) error {
 		return nil
 	}
 	if nb != '[' {
-		return ErrWrongSDFormat
+		return parsesyslog.ErrWrongSDFormat
 	}
 
-	var sds []StructuredDataElement
-	var sd StructuredDataElement
-	var sdp StructuredDataParam
+	var sds []parsesyslog.StructuredDataElement
+	var sd parsesyslog.StructuredDataElement
+	var sdp parsesyslog.StructuredDataParam
 	insideelem := true
 	insideparam := false
 	readname := false
@@ -129,7 +149,7 @@ func (m *RFC5424Msg) parseStructuredData(r *bufio.Reader, lm *LogMsg) error {
 		if b == ']' {
 			insideelem = false
 			sds = append(sds, sd)
-			sd = StructuredDataElement{}
+			sd = parsesyslog.StructuredDataElement{}
 			m.buf.Reset()
 			continue
 		}
@@ -157,7 +177,7 @@ func (m *RFC5424Msg) parseStructuredData(r *bufio.Reader, lm *LogMsg) error {
 			sdp.Value = m.buf.String()
 			m.buf.Reset()
 			sd.Param = append(sd.Param, sdp)
-			sdp = StructuredDataParam{}
+			sdp = parsesyslog.StructuredDataParam{}
 			continue
 		}
 		if b == ' ' && !insideelem {
@@ -175,7 +195,7 @@ func (m *RFC5424Msg) parseStructuredData(r *bufio.Reader, lm *LogMsg) error {
 
 // parseBOM will try to parse the BOM (if any) of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.4
-func (m *RFC5424Msg) parseBOM(r *bufio.Reader, lm *LogMsg) error {
+func (m *msg) parseBOM(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	bom, err := r.Peek(3)
 	if err != nil {
 		return err
@@ -188,24 +208,24 @@ func (m *RFC5424Msg) parseBOM(r *bufio.Reader, lm *LogMsg) error {
 
 // parseProtoVersion will try to parse the proto version part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.2
-func (m *RFC5424Msg) parseProtoVersion(r *bufio.Reader, lm *LogMsg) error {
-	b, _, err := readBytesUntilSpace(r)
+func (m *msg) parseProtoVersion(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	b, _, err := parsesyslog.ReadBytesUntilSpace(r)
 	if err != nil {
 		return err
 	}
-	pv, err := atoi(b)
+	pv, err := parsesyslog.Atoi(b)
 	if err != nil {
-		return ErrInvalidProtoVersion
+		return parsesyslog.ErrInvalidProtoVersion
 	}
-	lm.ProtoVersion = ProtoVersion(pv)
+	lm.ProtoVersion = parsesyslog.ProtoVersion(pv)
 	return nil
 }
 
 // parseTimestamp will try to parse the timestamp (or NILVALUE) part of the
 // RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.3
-func (m *RFC5424Msg) parseTimestamp(r *bufio.Reader, lm *LogMsg) error {
-	_, err := readBytesUntilSpaceOrNilValue(r, &m.buf)
+func (m *msg) parseTimestamp(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
 	if err != nil {
 		return err
 	}
@@ -217,7 +237,7 @@ func (m *RFC5424Msg) parseTimestamp(r *bufio.Reader, lm *LogMsg) error {
 	}
 	ts, err := time.Parse(time.RFC3339, m.buf.String())
 	if err != nil {
-		return ErrInvalidTimestamp
+		return parsesyslog.ErrInvalidTimestamp
 	}
 	lm.Timestamp = ts
 	return nil
@@ -225,8 +245,8 @@ func (m *RFC5424Msg) parseTimestamp(r *bufio.Reader, lm *LogMsg) error {
 
 // parseHostname will try to read the hostname part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.4
-func (m *RFC5424Msg) parseHostname(r *bufio.Reader, lm *LogMsg) error {
-	_, err := readBytesUntilSpaceOrNilValue(r, &m.buf)
+func (m *msg) parseHostname(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
 	if err != nil {
 		return err
 	}
@@ -242,8 +262,8 @@ func (m *RFC5424Msg) parseHostname(r *bufio.Reader, lm *LogMsg) error {
 
 // parseAppName will try to read the app name part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.5
-func (m *RFC5424Msg) parseAppName(r *bufio.Reader, lm *LogMsg) error {
-	_, err := readBytesUntilSpaceOrNilValue(r, &m.buf)
+func (m *msg) parseAppName(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
 	if err != nil {
 		return err
 	}
@@ -259,8 +279,8 @@ func (m *RFC5424Msg) parseAppName(r *bufio.Reader, lm *LogMsg) error {
 
 // parseProcID will try to read the process ID part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.6
-func (m *RFC5424Msg) parseProcID(r *bufio.Reader, lm *LogMsg) error {
-	_, err := readBytesUntilSpaceOrNilValue(r, &m.buf)
+func (m *msg) parseProcID(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
 	if err != nil {
 		return err
 	}
@@ -276,8 +296,8 @@ func (m *RFC5424Msg) parseProcID(r *bufio.Reader, lm *LogMsg) error {
 
 // parseMsgID will try to read the message ID part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.7
-func (m *RFC5424Msg) parseMsgID(r *bufio.Reader, lm *LogMsg) error {
-	_, err := readBytesUntilSpaceOrNilValue(r, &m.buf)
+func (m *msg) parseMsgID(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
 	if err != nil {
 		return err
 	}

@@ -2,36 +2,50 @@
 package parsesyslog
 
 import (
-	"bufio"
+	"errors"
 	"io"
-	"strings"
+	"sync"
+)
+
+var (
+	// lock protects the types during Register()
+	lock sync.RWMutex
+
+	// types is a map of installed message parser types, supplying a function that
+	//creates a new instance of that Parser.
+	types = map[ParserType]func() (Parser, error){}
+)
+
+var (
+	// ErrUnknownParserType is returned if a Parser is requested via New() which is not registered
+	ErrUnknownParserType = errors.New("unknown parser type")
 )
 
 // Parser defines the interface for parsing different types of Syslog messages
 type Parser interface {
-	parseReader(io.Reader) (LogMsg, error)
+	ParseReader(io.Reader) (LogMsg, error)
+	ParseString(s string) (LogMsg, error)
 }
 
-// NewRFC5424Parser returns a new Parser for RFC5424 messages
-func NewRFC5424Parser() *RFC5424Msg {
-	return &RFC5424Msg{}
+// ParserType is a type of parser for logs messages
+type ParserType string
+
+// Register does something
+func Register(t ParserType, fn func() (Parser, error)) {
+	lock.Lock()
+	defer lock.Unlock()
+	// if already registered, leave
+	if _, ok := types[t]; ok {
+		return
+	}
+	types[t] = fn
 }
 
-// NewRFC3164Parser returns a new Parser for RFC3164 messages
-func NewRFC3164Parser() *RFC3164Msg {
-	return &RFC3164Msg{}
-}
-
-// ParseReader returns the parsed log message based on the given parser
-// interface read from the io.Reader
-func ParseReader(p Parser, r io.Reader) (LogMsg, error) {
-	return p.parseReader(r)
-}
-
-// ParseString returns the parsed log message based on the given parser
-// interface read from a string (as buffered i/o)
-func ParseString(p Parser, s string) (LogMsg, error) {
-	sr := strings.NewReader(s)
-	br := bufio.NewReader(sr)
-	return p.parseReader(br)
+// New returns a new Parser based on the given parameter
+func New(t ParserType) (Parser, error) {
+	p, ok := types[t]
+	if !ok {
+		return nil, ErrUnknownParserType
+	}
+	return p()
 }

@@ -1,26 +1,46 @@
-package parsesyslog
+package rfc3164
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
+	"github.com/wneessen/go-parsesyslog"
 	"io"
+	"strings"
 	"time"
 )
 
-// RFC3164Msg represents a log message in that matches RFC3164
-type RFC3164Msg struct {
+// msg represents a log message in that matches RFC3164
+type msg struct {
 	buf  bytes.Buffer
 	app  bytes.Buffer
 	pid  bytes.Buffer
 	reol bool
 }
 
-// parseReader is the parser function that is able to interpret RFC3164 and
+// Type represents the ParserType for this Parser
+const Type parsesyslog.ParserType = "rfc3164"
+
+// init registeres the Parser
+func init() {
+	fn := func() (parsesyslog.Parser, error) {
+		return &msg{}, nil
+	}
+	parsesyslog.Register(Type, fn)
+}
+
+// ParseString returns the parsed log message read from a string (as buffered i/o)
+func (m *msg) ParseString(s string) (parsesyslog.LogMsg, error) {
+	sr := strings.NewReader(s)
+	br := bufio.NewReader(sr)
+	return m.ParseReader(br)
+}
+
+// ParseReader is the parser function that is able to interpret RFC3164 and
 // satisfies the Parser interface
-func (m *RFC3164Msg) parseReader(r io.Reader) (LogMsg, error) {
-	l := LogMsg{
-		Type: RFC3164,
+func (m *msg) ParseReader(r io.Reader) (parsesyslog.LogMsg, error) {
+	l := parsesyslog.LogMsg{
+		Type: parsesyslog.RFC3164,
 	}
 	m.reol = false
 
@@ -28,7 +48,7 @@ func (m *RFC3164Msg) parseReader(r io.Reader) (LogMsg, error) {
 	if err := m.parseHeader(bufr, &l); err != nil {
 		switch {
 		case errors.Is(err, io.EOF):
-			return l, ErrPrematureEOF
+			return l, parsesyslog.ErrPrematureEOF
 		default:
 			return l, err
 		}
@@ -52,8 +72,8 @@ func (m *RFC3164Msg) parseReader(r io.Reader) (LogMsg, error) {
 // parseHeader will try to parse the header of a RFC3164 syslog message and store
 // it in the provided LogMsg pointer
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *RFC3164Msg) parseHeader(r *bufio.Reader, lm *LogMsg) error {
-	if err := parsePriority(r, &m.buf, lm); err != nil {
+func (m *msg) parseHeader(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	if err := parsesyslog.ParsePriority(r, &m.buf, lm); err != nil {
 		return err
 	}
 	if err := m.parseTimestamp(r, lm); err != nil {
@@ -71,7 +91,7 @@ func (m *RFC3164Msg) parseHeader(r *bufio.Reader, lm *LogMsg) error {
 
 // parseTimestamp will try to parse the timestamp part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *RFC3164Msg) parseTimestamp(r *bufio.Reader, lm *LogMsg) error {
+func (m *msg) parseTimestamp(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	m.buf.Reset()
 	for m.buf.Len() < 16 {
 		b, err := r.ReadByte()
@@ -82,7 +102,7 @@ func (m *RFC3164Msg) parseTimestamp(r *bufio.Reader, lm *LogMsg) error {
 	}
 	ts, err := time.Parse(`Jan _2 15:04:05 `, m.buf.String())
 	if err != nil {
-		return ErrInvalidTimestamp
+		return parsesyslog.ErrInvalidTimestamp
 	}
 
 	if ts.Year() == 0 {
@@ -98,9 +118,9 @@ func (m *RFC3164Msg) parseTimestamp(r *bufio.Reader, lm *LogMsg) error {
 
 // parseHostname will try to parse the hostname part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *RFC3164Msg) parseHostname(r *bufio.Reader, lm *LogMsg) error {
+func (m *msg) parseHostname(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	m.buf.Reset()
-	h, _, err := readBytesUntilSpace(r)
+	h, _, err := parsesyslog.ReadBytesUntilSpace(r)
 	if err != nil {
 		return err
 	}
@@ -110,7 +130,7 @@ func (m *RFC3164Msg) parseHostname(r *bufio.Reader, lm *LogMsg) error {
 
 // parseTag will try to parse the tag part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *RFC3164Msg) parseTag(r *bufio.Reader, lm *LogMsg) error {
+func (m *msg) parseTag(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	m.buf.Reset()
 	m.app.Reset()
 	m.pid.Reset()

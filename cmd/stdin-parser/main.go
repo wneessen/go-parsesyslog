@@ -3,16 +3,21 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/wneessen/go-syslog"
+	"github.com/wneessen/go-parsesyslog"
+	"github.com/wneessen/go-parsesyslog/rfc5424"
 	"os"
 	"time"
 )
 
 func main() {
 	br := bufio.NewReader(os.Stdin)
-	p := parsesyslog.NewRFC5424Parser()
+	p, err := parsesyslog.New(rfc5424.Type)
+	if err != nil {
+		fmt.Printf("failed to create RFC5424 parser: %s", err)
+		os.Exit(1)
+	}
 	st := time.Now()
-	lm, err := parsesyslog.ParseReader(p, br)
+	lm, err := p.ParseReader(br)
 	if err != nil {
 		panic(err)
 	}

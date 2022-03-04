@@ -7,20 +7,20 @@ import (
 	"math"
 )
 
-// readMsgLength reads the first bytes of the log message which represent the total length of
+// ReadMsgLength reads the first bytes of the log message which represent the total length of
 // the log message
-func readMsgLength(r *bufio.Reader) (int, error) {
-	ls, _, err := readBytesUntilSpace(r)
+func ReadMsgLength(r *bufio.Reader) (int, error) {
+	ls, _, err := ReadBytesUntilSpace(r)
 	if err != nil {
 		return 0, err
 	}
-	return atoi(ls)
+	return Atoi(ls)
 }
 
-// readBytesUntilSpace is a helper method that takes a io.Reader and reads all bytes until it hits
+// ReadBytesUntilSpace is a helper method that takes a io.Reader and reads all bytes until it hits
 // a Space character. It returns the read bytes, the amount of bytes read and an error if one
 // occurred
-func readBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
+func ReadBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
 	buf, err := r.ReadSlice(' ')
 	if err != nil {
 		return buf, len(buf), err
@@ -31,10 +31,10 @@ func readBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
 	return buf, len(buf), nil
 }
 
-// readBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
+// ReadBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
 // it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
 // and an error if one occurred
-func readBytesUntilSpaceOrNilValue(r *bufio.Reader, buf *bytes.Buffer) (int, error) {
+func ReadBytesUntilSpaceOrNilValue(r *bufio.Reader, buf *bytes.Buffer) (int, error) {
 	buf.Reset()
 	tb := 0
 	for {
@@ -53,9 +53,9 @@ func readBytesUntilSpaceOrNilValue(r *bufio.Reader, buf *bytes.Buffer) (int, err
 	}
 }
 
-// parsePriority will try to parse the priority part of the RFC3164 header
+// ParsePriority will try to parse the priority part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.1
-func parsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
+func ParsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
 	buf.Reset()
 	b, err := r.ReadByte()
 	if err != nil {
@@ -74,7 +74,7 @@ func parsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
 		}
 		buf.WriteByte(b)
 	}
-	p, err := atoi(buf.Bytes())
+	p, err := Atoi(buf.Bytes())
 	if err != nil {
 		return ErrInvalidPrio
 	}
@@ -84,8 +84,8 @@ func parsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
 	return nil
 }
 
-// atoi performs allocation free ASCII number to integer conversion
-func atoi(b []byte) (int, error) {
+// Atoi performs allocation free ASCII number to integer conversion
+func Atoi(b []byte) (int, error) {
 	z := 0
 	c := 0
 	for x := len(b); x > 0; x-- {

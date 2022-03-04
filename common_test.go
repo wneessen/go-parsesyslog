@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Test_readBytesUntilSpace tests the readBytesUntilSpace helper method
+// Test_readBytesUntilSpace tests the ReadBytesUntilSpace helper method
 func Test_readBytesUntilSpace(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -25,22 +25,22 @@ func Test_readBytesUntilSpace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			got, got1, err := readBytesUntilSpace(br)
+			got, got1, err := ReadBytesUntilSpace(br)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("readBytesUntilSpace() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadBytesUntilSpace() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if string(got) != string(tt.bytes) {
-				t.Errorf("readBytesUntilSpace() got = %v, want %v", got, tt.bytes)
+				t.Errorf("ReadBytesUntilSpace() got = %v, want %v", got, tt.bytes)
 			}
 			if got1 != tt.length {
-				t.Errorf("readBytesUntilSpace() got1 = %v, want %v", got1, tt.length)
+				t.Errorf("ReadBytesUntilSpace() got1 = %v, want %v", got1, tt.length)
 			}
 		})
 	}
 }
 
-// Test_readBytesUntilSpaceOrNilValue tests the readBytesUntilSpaceOrNilValue helper method
+// Test_readBytesUntilSpaceOrNilValue tests the ReadBytesUntilSpaceOrNilValue helper method
 func Test_readBytesUntilSpaceOrNilValue(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -60,22 +60,22 @@ func Test_readBytesUntilSpaceOrNilValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			got1, err := readBytesUntilSpaceOrNilValue(br, &bb)
+			got1, err := ReadBytesUntilSpaceOrNilValue(br, &bb)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("readBytesUntilSpaceOrNilValue() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadBytesUntilSpaceOrNilValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if bb.String() != string(tt.bytes) {
-				t.Errorf("readBytesUntilSpaceOrNilValue() got = %s, want %s", bb.String(), string(tt.bytes))
+				t.Errorf("ReadBytesUntilSpaceOrNilValue() got = %s, want %s", bb.String(), string(tt.bytes))
 			}
 			if got1 != tt.length {
-				t.Errorf("readBytesUntilSpaceOrNilValue() got1 = %d, want %d", got1, tt.length)
+				t.Errorf("ReadBytesUntilSpaceOrNilValue() got1 = %d, want %d", got1, tt.length)
 			}
 		})
 	}
 }
 
-// Test_readMsgLength tests the readMsgLength method
+// Test_readMsgLength tests the ReadMsgLength method
 func Test_readMsgLength(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -92,56 +92,19 @@ func Test_readMsgLength(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.input)
 			br := bufio.NewReader(sr)
-			got, err := readMsgLength(br)
+			got, err := ReadMsgLength(br)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("readMsgLength() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadMsgLength() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("readMsgLength() got = %v, want %v", got, tt.want)
+				t.Errorf("ReadMsgLength() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test_parsePriority tests the parsePriority method
-//nolint:staticcheck
-func Test_parsePriority(t *testing.T) {
-	tests := []struct {
-		name         string
-		msg          string
-		wantPrio     Priority
-		wantFacility Facility
-		wantSeverity Severity
-		wantErr      bool
-	}{
-		{"Syslog/Notice is 5 and 5", `<45>1`, Syslog | Notice, 5, 5, false},
-		{"Kern/Emergency is 0 and 0", `<0>1`, Kern | Emergency, 0, 0, false},
-		{"Mail/Alert is 2 and 1", `<17>1`, Mail | Alert, 2, 1, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sr := strings.NewReader(tt.msg)
-			br := bufio.NewReader(sr)
-			m := &RFC5424Msg{}
-			lm := &LogMsg{}
-			if err := parsePriority(br, &m.buf, lm); (err != nil) != tt.wantErr {
-				t.Errorf("parseHeader() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if lm.Priority != tt.wantPrio {
-				t.Errorf("parseHeader() wrong prio = want: %d, got: %d", tt.wantPrio, lm.Priority)
-			}
-			if lm.Facility != tt.wantFacility {
-				t.Errorf("parseHeader() wrong facility = want: %d, got: %d", tt.wantFacility, lm.Facility)
-			}
-			if lm.Severity != tt.wantSeverity {
-				t.Errorf("parseHeader() wrong severity = want: %d, got: %d", tt.wantSeverity, lm.Severity)
-			}
-		})
-	}
-}
-
-// Benchmark_readBytesUntilSpace benchmarks the readBytesUntilSpace helper method
+// Benchmark_readBytesUntilSpace benchmarks the ReadBytesUntilSpace helper method
 func Benchmark_readBytesUntilSpace(b *testing.B) {
 	b.ReportAllocs()
 	sr := strings.NewReader("1234 ")
@@ -152,7 +115,7 @@ func Benchmark_readBytesUntilSpace(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ba, l, err = readBytesUntilSpace(br)
+		ba, l, err = ReadBytesUntilSpace(br)
 		if err != nil {
 			b.Errorf("failed to read bytes: %s", err)
 			break
@@ -166,7 +129,7 @@ func Benchmark_readBytesUntilSpace(b *testing.B) {
 	_, _ = ba, l
 }
 
-// Benchmark_readMsgLength benchmarks the readMsgLength helper method
+// Benchmark_readMsgLength benchmarks the ReadMsgLength helper method
 func Benchmark_readMsgLength(b *testing.B) {
 	b.ReportAllocs()
 	sr := strings.NewReader(`123 <13>1 test`)
@@ -176,7 +139,7 @@ func Benchmark_readMsgLength(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ml, err = readMsgLength(br)
+		ml, err = ReadMsgLength(br)
 		if err != nil {
 			b.Errorf("failed to read bytes: %s", err)
 			break

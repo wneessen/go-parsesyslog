@@ -1,3 +1,3 @@
-module github.com/wneessen/go-syslog
+module github.com/wneessen/go-parsesyslog
 
 go 1.17

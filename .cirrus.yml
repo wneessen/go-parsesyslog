@@ -19,7 +19,7 @@ build_task:
   modules_cache:
     fingerprint_script: cat go.sum
     folder: $GOPATH/pkg/mod
-  get_script: go get github.com/wneessen/go-syslog
-  build_script: go build github.com/wneessen/go-syslog
-  test_script: go test github.com/wneessen/go-syslog
+  get_script: go get github.com/wneessen/go-parsesyslog
+  build_script: go build github.com/wneessen/go-parsesyslog
+  test_script: go test github.com/wneessen/go-parsesyslog
 
