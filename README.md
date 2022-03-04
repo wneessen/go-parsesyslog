@@ -61,7 +61,7 @@ Available fields in the `LogMsg`:
 
 ## Usage
 
-`go-parsesyslog` implements an `Interface` for various syslog formats, which makes it easy to extend your own log
+`go-parsesyslog` implements an `interface` for various syslog formats, which makes it easy to extend your own log
 parser. As long as the `Parser` interface is satisfied, `go-parsesyslog` will be able to work.
 
 The interface looks as following:
@@ -75,12 +75,13 @@ type Parser interface {
 
 ### Parsing logs
 
-As you can see, the `ParseReader()` method expects an `io.Reader` interface as argument. This allows you to easily parse
-your logs from any kind of source (STDIN, a file, a network socket...)
+As you can see, the `ParseReader()` method expects an `io.Reader` interface as argument. This allows you to 
+easily parse your logs from any kind of source (STDIN, a file, a network socket...). ParseString() instead takes
+a string and parses it accordingly.
 
 #### Parsing RFC3164
 
-This example code show how to parse a RFC5424 conformant message:
+This example code show how to parse a RFC3164 conformant message:
 
 ```go
 package main
