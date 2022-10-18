@@ -2,10 +2,11 @@ package rfc5424
 
 import (
 	"bufio"
-	"github.com/wneessen/go-parsesyslog"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/wneessen/go-parsesyslog"
 )
 
 // TestParseStringRFC5424 tests the NewRFC5424Parser method together with the ParseString
@@ -106,14 +107,22 @@ func TestRFC5424Msg_parseTimestamp(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{`1985-04-12T23:20:50.52Z`, `1985-04-12T23:20:50.52Z `,
-			`1985-04-12 23:20:50.520 +00`, false},
-		{`1985-04-12T19:20:50.52-04:00`, `1985-04-12T23:20:50.52Z `,
-			`1985-04-12 23:20:50.520 +00`, false},
-		{`2003-10-11T22:14:15.003Z`, `2003-10-11T22:14:15.003Z `,
-			`2003-10-11 22:14:15.003 +00`, false},
-		{`2003-08-24T05:14:15.000003-07:00`, `2003-08-24T05:14:15.000003-07:00 `,
-			`2003-08-24 12:14:15.000 +00`, false},
+		{
+			`1985-04-12T23:20:50.52Z`, `1985-04-12T23:20:50.52Z `,
+			`1985-04-12 23:20:50.520 +00`, false,
+		},
+		{
+			`1985-04-12T19:20:50.52-04:00`, `1985-04-12T23:20:50.52Z `,
+			`1985-04-12 23:20:50.520 +00`, false,
+		},
+		{
+			`2003-10-11T22:14:15.003Z`, `2003-10-11T22:14:15.003Z `,
+			`2003-10-11 22:14:15.003 +00`, false,
+		},
+		{
+			`2003-08-24T05:14:15.000003-07:00`, `2003-08-24T05:14:15.000003-07:00 `,
+			`2003-08-24 12:14:15.000 +00`, false,
+		},
 		{`NILVALUE`, `- `, `0001-01-01 00:00:00.000 +00`, false},
 		{`Invalid TS`, `20211112345 `, `0001-01-01 00:00:00.000 +00`, true},
 	}
@@ -144,8 +153,10 @@ func TestRFC5424Msg_parseHostname(t *testing.T) {
 	}{
 		{`FQDN`, `host.domain.tld `, `host.domain.tld`, false},
 		{`IPv4`, `10.0.1.2 `, `10.0.1.2`, false},
-		{`IPv6`, `2345:0425:2CA1:0000:0000:0567:5673:23b5 `, `2345:0425:2CA1:0000:0000:0567:5673:23b5`,
-			false},
+		{
+			`IPv6`, `2345:0425:2CA1:0000:0000:0567:5673:23b5 `, `2345:0425:2CA1:0000:0000:0567:5673:23b5`,
+			false,
+		},
 		{`Host`, `test-machine `, `test-machine`, false},
 		{`NILVALUE`, `- `, ``, false},
 	}
@@ -260,17 +271,34 @@ func TestRFC5424Msg_parseStructuredData(t *testing.T) {
 		wantElemID     []string
 		wantErr        bool
 	}{
-		{`foo@1234 with 1 element`, `[foo@1234 Revision="1.2.3.4"] `,
-			[]string{`foo@1234`}, 1, 1, []string{"Revision"},
-			false},
-		{`foo@1234 with 3 elements`, `[foo@1234 Revision="1.2 3.4" intu="4" foo="bar"] `,
-			[]string{`foo@1234`}, 1, 3, []string{"Revision", "intu", "foo"},
-			false},
-		{`foo@1234 and bar@1234`, `[foo@1234 Revision="1.2.3.4"][bar@1234 Revision="1.2.3.4"] `,
-			[]string{`foo@1234`, `bar@1234`}, 2, 1, []string{"Revision"},
-			false},
-		{`NILVALUE`, `- `, []string{``}, 0, 0, []string{},
-			false},
+		{
+			`foo@1234 with 1 element`, `[foo@1234 Revision="1.2.3.4"] `,
+			[]string{`foo@1234`},
+			1, 1,
+			[]string{"Revision"},
+			false,
+		},
+		{
+			`foo@1234 with 3 elements`, `[foo@1234 Revision="1.2 3.4" intu="4" foo="bar"] `,
+			[]string{`foo@1234`},
+			1, 3,
+			[]string{"Revision", "intu", "foo"},
+			false,
+		},
+		{
+			`foo@1234 and bar@1234`, `[foo@1234 Revision="1.2.3.4"][bar@1234 Revision="1.2.3.4"] `,
+			[]string{`foo@1234`, `bar@1234`},
+			2, 1,
+			[]string{"Revision"},
+			false,
+		},
+		{
+			`NILVALUE`, `- `,
+			[]string{``},
+			0, 0,
+			[]string{},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -317,7 +345,6 @@ func TestRFC5424Msg_parseStructuredData(t *testing.T) {
 					t.Error("parseStructuredData() param names = not all parameters found")
 				}
 			}
-
 		})
 	}
 }

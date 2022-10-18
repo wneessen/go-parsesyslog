@@ -3,10 +3,11 @@ package rfc3164
 import (
 	"bufio"
 	"errors"
-	"github.com/wneessen/go-parsesyslog"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/wneessen/go-parsesyslog"
 )
 
 // TestParseStringRFC3164 tests the NewRFC3164Parser method together with the ParseString
@@ -59,8 +60,10 @@ func TestRFC3164Msg_parseTag(t *testing.T) {
 		wantErr  bool
 		wantText string
 	}{
-		{"valid tag with pid", `syslog-ng[1122680]: Test123`, `syslog-ng`, `1122680`,
-			false, `Test123`},
+		{
+			"valid tag with pid", `syslog-ng[1122680]: Test123`, `syslog-ng`, `1122680`,
+			false, `Test123`,
+		},
 		{"valid tag no pid", `su: Test123`, `su`, ``, false, `Test123`},
 		{"no tag", `This is a test `, ``, ``, false, `This is a test `},
 		{"mark", "-- MARK --\n", ``, ``, false, "-- MARK --\n"},

@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"github.com/wneessen/go-parsesyslog"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/wneessen/go-parsesyslog"
 )
 
 // msg represents a log message in that matches RFC3164
