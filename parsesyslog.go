@@ -12,14 +12,12 @@ var (
 	lock sync.RWMutex
 
 	// types is a map of installed message parser types, supplying a function that
-	//creates a new instance of that Parser.
+	// creates a new instance of that Parser.
 	types = map[ParserType]func() (Parser, error){}
 )
 
-var (
-	// ErrUnknownParserType is returned if a Parser is requested via New() which is not registered
-	ErrUnknownParserType = errors.New("unknown parser type")
-)
+// ErrUnknownParserType is returned if a Parser is requested via New() which is not registered
+var ErrUnknownParserType = errors.New("unknown parser type")
 
 // Parser defines the interface for parsing different types of Syslog messages
 type Parser interface {

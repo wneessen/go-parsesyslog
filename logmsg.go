@@ -17,7 +17,7 @@ type LogMsg struct {
 	Facility Facility
 	HasBOM   bool
 	Hostname string
-	//Message        []byte
+	// Message        []byte
 	Message        bytes.Buffer
 	MsgLength      int
 	MsgID          string

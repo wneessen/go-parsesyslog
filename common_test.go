@@ -50,8 +50,10 @@ func Test_readBytesUntilSpaceOrNilValue(t *testing.T) {
 		wantErr bool
 	}{
 		{"test1", `123-test - blubb`, []byte("123-test"), 9, false},
-		{"timestamp", `2016-02-28T09:57:10.804642398-05:00 - - `,
-			[]byte("2016-02-28T09:57:10.804642398-05:00"), 36, false},
+		{
+			"timestamp", `2016-02-28T09:57:10.804642398-05:00 - - `,
+			[]byte("2016-02-28T09:57:10.804642398-05:00"), 36, false,
+		},
 		{"NILVAL", ` - foo bar`, []byte{}, 1, false},
 		{"empty", ``, []byte{}, 0, true},
 	}
