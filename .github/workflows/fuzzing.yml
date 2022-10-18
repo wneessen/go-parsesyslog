@@ -1,0 +1,28 @@
+name: Go fuzzing
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.go'
+      - 'go.*'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.go'
+      - 'go.*'
+jobs:
+  run:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: [1.19]
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@master
+
+    - name: Run Fuzzing Tests
+      run: |
+        go test -v -race -fuzz=. --fuzztime=10s . && go test -v -race -fuzz=. --fuzztime=10s ./rfc3164 && go test -v -race -fuzz=. --fuzztime=10s ./rfc5424
