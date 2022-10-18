@@ -155,17 +155,3 @@ func Benchmark_readMsgLength(b *testing.B) {
 	}
 	_ = ml
 }
-
-// FuzzAtoi performs a fuzzing test on Atoi
-func FuzzAtoi(f *testing.F) {
-	tests := [][]byte{[]byte("1"), []byte("123"), []byte("255"), []byte("-1"), []byte("A")}
-	for _, t := range tests {
-		f.Add(t)
-	}
-	f.Fuzz(func(t *testing.T, ns []byte) {
-		_, err := Atoi(ns)
-		if err != nil {
-			return
-		}
-	})
-}
