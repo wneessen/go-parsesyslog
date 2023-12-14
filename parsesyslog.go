@@ -1,8 +1,12 @@
-// Package parsesyslog implements a syslog message parser for different RFC log formats
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
+// Package parsesyslog implements a syslog message parser for different
+// RFC log formats
 package parsesyslog
 
 import (
-	"errors"
 	"io"
 	"sync"
 )
@@ -15,9 +19,6 @@ var (
 	// creates a new instance of that Parser.
 	types = map[ParserType]func() (Parser, error){}
 )
-
-// ErrUnknownParserType is returned if a Parser is requested via New() which is not registered
-var ErrUnknownParserType = errors.New("unknown parser type")
 
 // Parser defines the interface for parsing different types of Syslog messages
 type Parser interface {
@@ -43,7 +44,7 @@ func Register(t ParserType, fn func() (Parser, error)) {
 func New(t ParserType) (Parser, error) {
 	p, ok := types[t]
 	if !ok {
-		return nil, ErrUnknownParserType
+		return nil, ErrParserTypeUnknown
 	}
 	return p()
 }

@@ -1,3 +1,9 @@
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
+// Package rfc5424 implements a go-parsesyslog parser for the syslog format
+// as described in RFC5424
 package rfc5424
 
 import (
