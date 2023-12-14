@@ -20,7 +20,7 @@ var (
 	types = map[ParserType]func() (Parser, error){}
 )
 
-// Parser defines the interface for parsing different types of Syslog messages
+// Parser is an interface for parsing log messages.
 type Parser interface {
 	ParseReader(io.Reader) (LogMsg, error)
 	ParseString(s string) (LogMsg, error)
@@ -29,7 +29,8 @@ type Parser interface {
 // ParserType is a type of parser for logs messages
 type ParserType string
 
-// Register does something
+// Register registers a new ParserType with its corresponding
+// Parser function.
 func Register(t ParserType, fn func() (Parser, error)) {
 	lock.Lock()
 	defer lock.Unlock()
@@ -40,7 +41,13 @@ func Register(t ParserType, fn func() (Parser, error)) {
 	types[t] = fn
 }
 
-// New returns a new Parser based on the given parameter
+// New returns a Parser of the specified ParserType and an error.
+// It looks up the ParserType in the types map and if found,
+// calls the corresponding Parser function to create a new Parser
+// instance.
+//
+// If the ParserType is not found in the map, it returns nil
+// and ErrParserTypeUnknown.
 func New(t ParserType) (Parser, error) {
 	p, ok := types[t]
 	if !ok {
