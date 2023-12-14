@@ -16,7 +16,7 @@ var (
 	lock sync.RWMutex
 
 	// types is a map of installed message parser types, supplying a function that
-	//creates a new instance of that Parser.
+	// creates a new instance of that Parser.
 	types = map[ParserType]func() (Parser, error){}
 )
 

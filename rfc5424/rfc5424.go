@@ -79,7 +79,7 @@ func (m *msg) ParseReader(r io.Reader) (parsesyslog.LogMsg, error) {
 		return l, nil
 	}
 
-	//rb := make([]byte, ml - l.Message.Len())
+	// rb := make([]byte, ml - l.Message.Len())
 	md, err := io.ReadAll(br)
 	if err != nil {
 		return l, err
