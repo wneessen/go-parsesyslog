@@ -20,8 +20,6 @@ var (
 	types = map[ParserType]func() (Parser, error){}
 )
 
-var ()
-
 // Parser defines the interface for parsing different types of Syslog messages
 type Parser interface {
 	ParseReader(io.Reader) (LogMsg, error)
