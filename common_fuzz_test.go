@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: 2022 Winni Neessen <winni@neessen.dev>
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
 //
-// SPDX-License-Identifier: MI
+// SPDX-License-Identifier: MIT
 
 //go:build go1.18
 // +build go1.18
