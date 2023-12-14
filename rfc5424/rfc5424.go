@@ -1,13 +1,20 @@
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
+// Package rfc5424 implements a go-parsesyslog parser for the syslog format
+// as described in RFC5424
 package rfc5424
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
-	"github.com/wneessen/go-parsesyslog"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/wneessen/go-parsesyslog"
 )
 
 // msg represents a log message in that matches RFC5424

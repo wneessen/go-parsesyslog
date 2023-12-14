@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
 package parsesyslog
 
 // SeverityMask is the bitmask representing the Severity in the Priority

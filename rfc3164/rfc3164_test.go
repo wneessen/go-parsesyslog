@@ -1,12 +1,17 @@
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
 package rfc3164
 
 import (
 	"bufio"
 	"errors"
-	"github.com/wneessen/go-parsesyslog"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/wneessen/go-parsesyslog"
 )
 
 // TestParseStringRFC3164 tests the NewRFC3164Parser method together with the ParseString

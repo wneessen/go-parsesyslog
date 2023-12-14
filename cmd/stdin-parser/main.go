@@ -1,12 +1,17 @@
+// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
 package main
 
 import (
 	"bufio"
 	"fmt"
-	"github.com/wneessen/go-parsesyslog"
-	"github.com/wneessen/go-parsesyslog/rfc5424"
 	"os"
 	"time"
+
+	"github.com/wneessen/go-parsesyslog"
+	"github.com/wneessen/go-parsesyslog/rfc5424"
 )
 
 func main() {
