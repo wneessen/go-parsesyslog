@@ -68,7 +68,17 @@ func SeverityFromPrio(p Priority) Severity {
 
 // FacilityStringFromPrio returns a string representation of the Facility of a given Priority
 func FacilityStringFromPrio(p Priority) string {
-	switch FacilityFromPrio(p) {
+	return FacilityFromPrio(p).String()
+}
+
+// SeverityStringFromPrio returns a string representation of the Severity of a given Priority
+func SeverityStringFromPrio(p Priority) string {
+	return SeverityFromPrio(p).String()
+}
+
+// String satisfies the fmt.Stringer interface for the Facility type
+func (f Facility) String() string {
+	switch f {
 	case 0:
 		return "KERN"
 	case 1:
@@ -122,9 +132,9 @@ func FacilityStringFromPrio(p Priority) string {
 	}
 }
 
-// SeverityStringFromPrio returns a string representation of the Severity of a given Priority
-func SeverityStringFromPrio(p Priority) string {
-	switch SeverityFromPrio(p) {
+// String satisfies the fmt.Stringer interface for the Severity type
+func (s Severity) String() string {
+	switch s {
 	case 0:
 		return "EMERGENCY"
 	case 1:
