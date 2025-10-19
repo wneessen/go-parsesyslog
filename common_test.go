@@ -34,7 +34,7 @@ func Test_readBytesUntilSpace(t *testing.T) {
 				t.Errorf("ReadBytesUntilSpace() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if string(got) != string(tt.bytes) {
+			if !bytes.Equal(got, tt.bytes) {
 				t.Errorf("ReadBytesUntilSpace() got = %v, want %v", got, tt.bytes)
 			}
 			if got1 != tt.length {
@@ -71,8 +71,8 @@ func Test_readBytesUntilSpaceOrNilValue(t *testing.T) {
 				t.Errorf("ReadBytesUntilSpaceOrNilValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if bb.String() != string(tt.bytes) {
-				t.Errorf("ReadBytesUntilSpaceOrNilValue() got = %s, want %s", bb.String(), string(tt.bytes))
+			if !bytes.Equal(bb.Bytes(), tt.bytes) {
+				t.Errorf("ReadBytesUntilSpaceOrNilValue() got = %s, want %s", bb.String(), tt.bytes)
 			}
 			if got1 != tt.length {
 				t.Errorf("ReadBytesUntilSpaceOrNilValue() got1 = %d, want %d", got1, tt.length)

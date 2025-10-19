@@ -12,84 +12,112 @@ import (
 	"errors"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/wneessen/go-parsesyslog"
 )
 
 // msg represents a log message in that matches RFC3164
 type msg struct {
-	buf  bytes.Buffer
-	app  bytes.Buffer
-	pid  bytes.Buffer
-	reol bool
+	buf       bytes.Buffer
+	appBuffer *bytes.Buffer
+	pidBuffer *bytes.Buffer
+	reol      bool
 }
 
-// Type represents the ParserType for this Parser
-const Type parsesyslog.ParserType = "rfc3164"
+const (
+	// Type represents the ParserType for this Parser
+	Type parsesyslog.ParserType = "rfc3164"
+)
+
+const (
+	// maxTagLength defines the maximum length for a tag in an RFC3164 syslog message.
+	maxTagLength = 32
+	// colonSeparator represents the colon character ':' used as a delimiter in RFC3164 syslog message parsing.
+	colonSeparator = 58
+	// spaceChar represents the space character used as a delimiter in parsing RFC3164 syslog messages.
+	spaceChar = 32
+	// newlineChar defines the newline character used to detect the end of a line in RFC3164 syslog message parsing.
+	newlineChar = 10
+	// leftBracket represents the opening square bracket character used in parsing or formatting operations.
+	leftBracket = 91
+	// rightBracket represents the closing square bracket character used in parsing or formatting operations.
+	rightBracket = 93
+)
 
 // init registers the Parser
 func init() {
 	fn := func() (parsesyslog.Parser, error) {
-		return &msg{}, nil
+		return &msg{
+			appBuffer: bytes.NewBuffer(nil),
+			pidBuffer: bytes.NewBuffer(nil),
+		}, nil
 	}
 	parsesyslog.Register(Type, fn)
 }
 
 // ParseString returns the parsed log message read from a string (as buffered i/o)
-func (m *msg) ParseString(s string) (parsesyslog.LogMsg, error) {
-	sr := strings.NewReader(s)
-	br := bufio.NewReader(sr)
-	return m.ParseReader(br)
+func (m *msg) ParseString(message string) (parsesyslog.LogMsg, error) {
+	stringReader := strings.NewReader(message)
+	bufferedReader := bufio.NewReader(stringReader)
+	return m.ParseReader(bufferedReader)
 }
 
 // ParseReader is the parser function that is able to interpret RFC3164 and
 // satisfies the Parser interface
 func (m *msg) ParseReader(r io.Reader) (parsesyslog.LogMsg, error) {
-	l := parsesyslog.LogMsg{
+	logMessage := parsesyslog.LogMsg{
 		Type: parsesyslog.RFC3164,
 	}
 	m.reol = false
 
-	bufr := bufio.NewReaderSize(r, 1024)
-	if err := m.parseHeader(bufr, &l); err != nil {
+	bufferedString := bufio.NewReaderSize(r, 1024)
+	if err := m.parseHeader(bufferedString, &logMessage); err != nil {
 		switch {
 		case errors.Is(err, io.EOF):
-			return l, parsesyslog.ErrPrematureEOF
+			return logMessage, parsesyslog.ErrPrematureEOF
 		default:
-			return l, err
+			return logMessage, err
 		}
 	}
 
 	if !m.reol {
-		rd, err := bufr.ReadSlice('\n')
+		rd, err := bufferedString.ReadSlice('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
-			return l, err
+			return logMessage, err
 		}
-		_, err = l.Message.Write(rd)
+
+		_, err = logMessage.Message.Write(rd)
 		if err != nil {
-			return l, err
+			return logMessage, err
 		}
 	}
-	l.MsgLength = l.Message.Len()
+	logMessage.MsgLength = logMessage.Message.Len()
 
-	return l, nil
+	return logMessage, nil
 }
 
 // parseHeader will try to parse the header of a RFC3164 syslog message and store
 // it in the provided LogMsg pointer
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *msg) parseHeader(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	if err := parsesyslog.ParsePriority(r, &m.buf, lm); err != nil {
+func (m *msg) parseHeader(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
+	if err := parsesyslog.ParsePriority(reader, &m.buf, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseTimestamp(r, lm); err != nil {
+	if err := m.parseTimestamp(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseHostname(r, lm); err != nil {
+	if err := m.parseHostname(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseTag(r, lm); err != nil {
+
+	/*
+		_, _, _ = parsesyslog.ReadBytesUntilSpace(reader)
+		_, _, _ = parsesyslog.ReadBytesUntilSpace(reader)
+		_, _, _ = parsesyslog.ReadBytesUntilSpace(reader)
+		_, _, _ = parsesyslog.ReadBytesUntilSpace(reader)
+
+	*/
+	if err := m.parseTag(reader, logMessage); err != nil {
 		return err
 	}
 
@@ -98,136 +126,116 @@ func (m *msg) parseHeader(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 
 // parseTimestamp will try to parse the timestamp part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *msg) parseTimestamp(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+func (m *msg) parseTimestamp(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
 	m.buf.Reset()
-	for m.buf.Len() < 16 {
-		b, err := r.ReadByte()
+	var err error
+	var b byte
+
+	for m.buf.Len() < timestampLength {
+		b, err = reader.ReadByte()
 		if err != nil {
 			return err
 		}
 		m.buf.WriteByte(b)
 	}
-	ts, err := time.Parse(`Jan _2 15:04:05 `, m.buf.String())
-	if err != nil {
-		return parsesyslog.ErrInvalidTimestamp
+	if discard, err := reader.Discard(1); err != nil || discard != 1 {
+		return errors.New("failed to discard space")
 	}
 
-	if ts.Year() == 0 {
-		ts = time.Date(time.Now().Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(),
-			ts.Second(), ts.Nanosecond(), ts.Location())
-		lm.Timestamp = ts
-		return nil
-	}
-
-	lm.Timestamp = ts
-	return nil
+	logMessage.Timestamp, err = ParseTimestamp(m.buf.Bytes())
+	return err
 }
 
 // parseHostname will try to parse the hostname part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *msg) parseHostname(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+func (m *msg) parseHostname(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
 	m.buf.Reset()
-	h, _, err := parsesyslog.ReadBytesUntilSpace(r)
+	hostname, _, err := parsesyslog.ReadBytesUntilSpace(reader)
 	if err != nil {
 		return err
 	}
-	lm.Hostname = string(h)
+	logMessage.Host = hostname
+
 	return nil
 }
 
 // parseTag will try to parse the tag part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
-func (m *msg) parseTag(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
+func (m *msg) parseTag(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
 	m.buf.Reset()
-	m.app.Reset()
-	m.pid.Reset()
+	m.appBuffer.Reset()
+	m.pidBuffer.Reset()
 
-	hascolon, inpid := false, false
-	sb := 0
-	for c := 0; c < 32; c++ {
-		b, err := r.ReadByte()
+	hasColon, inPid := false, false
+	bytesRead := 0
+
+	// Read up to maxTagLength bytes to parse the tag
+	for c := 0; c < maxTagLength; c++ {
+		b, err := reader.ReadByte()
 		if err != nil {
 			return err
 		}
 		m.buf.WriteByte(b)
-		if b == '\n' {
-			sb++
+		bytesRead++
+
+		if b == newlineChar {
 			m.reol = true
 			break
 		}
-		if b == ' ' {
-			sb++
+		if b == spaceChar {
 			break
 		}
-		if b == ':' {
-			hascolon = true
-			sb++
+		if b == colonSeparator {
+			hasColon = true
 			continue
 		}
-		if b == '[' && !inpid {
-			inpid = true
-			sb++
+		if b == leftBracket && !inPid {
+			inPid = true
 			continue
 		}
-		if b == ']' && inpid {
-			inpid = false
-			sb++
+		if b == rightBracket && inPid {
+			inPid = false
 			continue
-		}
-		if !inpid {
-			m.app.WriteByte(b)
-		}
-		if inpid {
-			m.pid.WriteByte(b)
-		}
-	}
-	if hascolon && m.app.Len() > 0 {
-		if m.app.Len() > 0 {
-			lm.AppName = m.app.String()
-			sb += m.app.Len()
-		}
-		if m.pid.Len() > 0 {
-			lm.ProcID = m.pid.String()
-			sb += m.pid.Len()
-		}
-		for x := sb; x < 32; x++ {
-			b, err := r.ReadByte()
-			if err != nil {
-				switch {
-				case errors.Is(err, io.EOF):
-					return nil
-				default:
-					return err
-				}
-			}
-			lm.Message.WriteByte(b)
-			if b == '\n' {
-				m.reol = true
-				break
-			}
 		}
 
-		return nil
+		if !inPid {
+			m.appBuffer.WriteByte(b)
+			continue
+		}
+		m.pidBuffer.WriteByte(b)
 	}
 
+	// We have a valid tag (colon present and app name exists)
+	if hasColon && m.appBuffer.Len() > 0 {
+		logMessage.App = m.appBuffer.Bytes()
+		if m.pidBuffer.Len() > 0 {
+			logMessage.PID = m.pidBuffer.Bytes()
+		}
+		return m.readMessageContent(reader, logMessage, bytesRead)
+	}
+
+	// No valid tag found, treat buffer content as message
 	if m.buf.Len() > 0 {
-		_, err := lm.Message.Write(m.buf.Bytes())
-		if err != nil {
+		if _, err := logMessage.Message.Write(m.buf.Bytes()); err != nil {
 			return err
 		}
 	}
-	for c := m.buf.Len(); c < 32; c++ {
-		b, err := r.ReadByte()
+
+	return m.readMessageContent(reader, logMessage, m.buf.Len())
+}
+
+// readMessageContent reads the remaining message content up to maxTagLength or newline
+func (m *msg) readMessageContent(reader *bufio.Reader, logMessage *parsesyslog.LogMsg, startPosition int) error {
+	for x := startPosition; x < maxTagLength; x++ {
+		b, err := reader.ReadByte()
 		if err != nil {
-			switch {
-			case errors.Is(err, io.EOF):
+			if errors.Is(err, io.EOF) {
 				return nil
-			default:
-				return err
 			}
+			return err
 		}
-		lm.Message.WriteByte(b)
-		if b == '\n' {
+		logMessage.Message.WriteByte(b)
+		if b == newlineChar {
 			m.reol = true
 			break
 		}

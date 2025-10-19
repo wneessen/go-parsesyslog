@@ -6,6 +6,7 @@ package rfc5424
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ func TestParseStringRFC5424(t *testing.T) {
 	if l.MsgLength != 13 {
 		t.Errorf("ParseString() wrong msg length => expected: %d, got: %d", 13, l.MsgLength)
 	}
-	if l.MsgID != "" {
+	if !bytes.Equal(l.MsgID, []byte("")) {
 		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
 	}
 	if l.ProcID != "" {
@@ -74,7 +75,7 @@ func TestParseReaderRFC5424(t *testing.T) {
 	if l.MsgLength != 13 {
 		t.Errorf("ParseString() wrong msg length => expected: %d, got: %d", 13, l.MsgLength)
 	}
-	if l.MsgID != "" {
+	if !bytes.Equal(l.MsgID, []byte("")) {
 		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
 	}
 	if l.ProcID != "" {
@@ -173,8 +174,8 @@ func TestRFC5424Msg_parseHostname(t *testing.T) {
 			if err := m.parseHostname(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if lm.Hostname != tt.want {
-				t.Errorf("parseHostname() wrong = expected: %s, got: %s", tt.want, lm.Hostname)
+			if !bytes.Equal(lm.Host, []byte(tt.want)) {
+				t.Errorf("parseHostname() wrong = expected: %s, got: %s", tt.want, lm.Hostname())
 			}
 		})
 	}
@@ -229,7 +230,7 @@ func TestRFC5424Msg_parseMsgID(t *testing.T) {
 			if err := m.parseMsgID(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if lm.MsgID != tt.want {
+			if !bytes.Equal(lm.MsgID, []byte(tt.want)) {
 				t.Errorf("parseHostname() wrong = expected: %s, got: %s", tt.want, lm.MsgID)
 			}
 		})

@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -221,7 +220,7 @@ func (m *msg) parseProtoVersion(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	if err != nil {
 		return err
 	}
-	pv, err := strconv.Atoi(string(b))
+	pv, err := parsesyslog.ParseUintBytes(b)
 	if err != nil {
 		return parsesyslog.ErrInvalidProtoVersion
 	}
@@ -264,7 +263,7 @@ func (m *msg) parseHostname(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	if m.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.Hostname = m.buf.String()
+	lm.Host = m.buf.Bytes()
 	return nil
 }
 
@@ -315,6 +314,6 @@ func (m *msg) parseMsgID(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	if m.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.MsgID = m.buf.String()
+	lm.MsgID = m.buf.Bytes()
 	return nil
 }

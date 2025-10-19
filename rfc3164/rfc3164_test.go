@@ -6,6 +6,7 @@ package rfc3164
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"strings"
@@ -22,19 +23,19 @@ func TestParseStringRFC3164(t *testing.T) {
 		t.Errorf("failed to create new RFC3164 parser")
 		return
 	}
-	msg := "<13>Nov 27 16:00:35 arch-vm wneessen[1130275]: test\n"
-	l, err := p.ParseString(msg)
+	message := "<13>Nov 27 16:00:35 arch-vm wneessen[1130275]: test\n"
+	l, err := p.ParseString(message)
 	if err != nil {
 		t.Errorf("failed to parse message: %s", err)
 	}
 	if l.MsgLength != 5 {
-		t.Errorf("ParseString() wrong msg length => expected: %d, got: %d", 5, l.MsgLength)
+		t.Errorf("ParseString() wrong message length => expected: %d, got: %d", 5, l.MsgLength)
 	}
-	if l.MsgID != "" {
-		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
+	if !bytes.Equal(l.MsgID, []byte("")) {
+		t.Errorf("ParseString() wrong message ID => expected: %s, got: %s", "", l.MsgID)
 	}
-	if l.ProcID != "1130275" {
-		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "1130275", l.ProcID)
+	if !bytes.Equal(l.PID, []byte("1130275")) {
+		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "1130275", l.PID)
 	}
 	if l.Message.String() != "test\n" {
 		t.Errorf("ParseString() wrong message => expected: %q, got: %q", "test\n", l.Message.String())
@@ -76,7 +77,7 @@ func TestRFC3164Msg_parseTag(t *testing.T) {
 		sr := strings.NewReader(tt.msg)
 		br := bufio.NewReader(sr)
 		t.Run(tt.name, func(t *testing.T) {
-			m := &msg{}
+			m := &msg{appBuffer: bytes.NewBuffer(nil), pidBuffer: bytes.NewBuffer(nil)}
 			lm := &parsesyslog.LogMsg{}
 			if err := m.parseTag(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseTag() error = %v, wantErr %v", err, tt.wantErr)
@@ -84,11 +85,11 @@ func TestRFC3164Msg_parseTag(t *testing.T) {
 			if lm.Message.String() != tt.wantText {
 				t.Errorf("parseTag() wrong msg => want: %q, got: %q", tt.wantText, lm.Message.String())
 			}
-			if lm.AppName != tt.want {
-				t.Errorf("parseTag() wrong app => want: %q, got: %q", tt.want, lm.AppName)
+			if !bytes.Equal(lm.App, []byte(tt.want)) {
+				t.Errorf("parseTag() wrong app => want: %q, got: %q", tt.want, lm.App)
 			}
-			if lm.ProcID != tt.wantpid {
-				t.Errorf("parseTag() wrong pid => want: %s, got: %s", tt.wantpid, lm.ProcID)
+			if !bytes.Equal(lm.PID, []byte(tt.wantpid)) {
+				t.Errorf("parseTag() wrong pid => want: %s, got: %s", tt.wantpid, lm.PID)
 			}
 		})
 	}
@@ -98,7 +99,7 @@ func TestRFC3164Msg_parseTag(t *testing.T) {
 func TestRFC3164Msg_ParseReader(t *testing.T) {
 	sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8")
 	br := bufio.NewReader(sr)
-	m := msg{}
+	m := &msg{appBuffer: bytes.NewBuffer(nil), pidBuffer: bytes.NewBuffer(nil)}
 
 	lm, err := m.ParseReader(br)
 	if err != nil {

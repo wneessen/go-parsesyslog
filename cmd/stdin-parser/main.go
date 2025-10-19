@@ -33,7 +33,7 @@ func main() {
 	fmt.Printf("  - Priority:         %d (Facility: %s / Severity: %s)\n", lm.Priority,
 		parsesyslog.FacilityStringFromPrio(lm.Priority), parsesyslog.SeverityStringFromPrio(lm.Priority))
 	fmt.Printf("  - Protocol Version: %d\n", lm.ProtoVersion)
-	fmt.Printf("  - Hostname:         %s\n", lm.Hostname)
+	fmt.Printf("  - Hostname:         %s\n", lm.Host)
 	fmt.Printf("  - AppName:          %s\n", lm.AppName)
 	fmt.Printf("  - ProcID:           %s\n", lm.ProcID)
 	fmt.Printf("  - MsgID:            %s\n", lm.MsgID)

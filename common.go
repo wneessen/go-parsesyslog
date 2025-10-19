@@ -21,18 +21,19 @@ const (
 // ReadMsgLength reads a space-delimited length prefix from the provided bufio.Reader, converts
 // it to an integer, and returns it.
 func ReadMsgLength(r *bufio.Reader) (int, error) {
-	ls, _, err := ReadBytesUntilSpace(r)
+	length, _, err := ReadBytesUntilSpace(r)
 	if err != nil {
 		return 0, err
 	}
-	return strconv.Atoi(string(ls))
+
+	return ParseUintBytes(length)
 }
 
 // ReadBytesUntilSpace reads bytes from the provided bufio.Reader until the first space character (' ')
 // is encountered. It returns the bytes read (excluding the trailing space), the total number of bytes
 // read, and any error encountered.
 func ReadBytesUntilSpace(reader *bufio.Reader) ([]byte, int, error) {
-	buf, err := reader.ReadBytes(' ')
+	buf, err := reader.ReadSlice(space)
 	if err != nil {
 		return buf, len(buf), err
 	}
@@ -99,10 +100,24 @@ func readPriorityValue(reader *bufio.Reader, buffer *bytes.Buffer) (int, error) 
 		buffer.WriteByte(data)
 	}
 
-	priority, err := strconv.Atoi(buffer.String())
+	priority, err := ParseUintBytes(buffer.Bytes())
 	if err != nil {
 		return 0, ErrInvalidPrio
 	}
 
 	return priority, nil
+}
+
+func ParseUintBytes(b []byte) (int, error) {
+	if len(b) == 0 {
+		return 0, strconv.ErrSyntax
+	}
+	n := 0
+	for _, c := range b {
+		if c < '0' || c > '9' {
+			return 0, strconv.ErrSyntax
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }

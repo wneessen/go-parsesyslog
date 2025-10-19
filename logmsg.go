@@ -18,15 +18,15 @@ const (
 
 // LogMsg represents a Syslog message containing metadata and parsed log content based on RFC specifications.
 type LogMsg struct {
-	AppName        string
+	App            []byte
 	Facility       Facility
 	HasBOM         bool
-	Hostname       string
+	Host           []byte
 	Message        bytes.Buffer
 	MsgLength      int
-	MsgID          string
+	MsgID          []byte
 	Priority       Priority
-	ProcID         string
+	PID            []byte
 	ProtoVersion   ProtoVersion
 	Severity       Severity
 	StructuredData []StructuredDataElement
@@ -53,4 +53,16 @@ type StructuredDataElement struct {
 type StructuredDataParam struct {
 	Name  string
 	Value string
+}
+
+func (l *LogMsg) Hostname() string {
+	return string(l.Host)
+}
+
+func (l *LogMsg) AppName() string {
+	return string(l.App)
+}
+
+func (l *LogMsg) ProcID() string {
+	return string(l.PID)
 }
