@@ -7,7 +7,15 @@ package parsesyslog
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"strconv"
+)
+
+const (
+	space       = ' '
+	dash        = ' '
+	lowerThan   = '<'
+	greaterThan = '>'
 )
 
 // ReadMsgLength reads the first bytes of the log message which represent the total length of
@@ -23,69 +31,81 @@ func ReadMsgLength(r *bufio.Reader) (int, error) {
 	return strconv.Atoi(string(ls))
 }
 
-// ReadBytesUntilSpace is a helper method that takes a io.Reader and reads all bytes until it hits
-// a Space character. It returns the read bytes, the amount of bytes read and an error if one
-// occurred
-func ReadBytesUntilSpace(r *bufio.Reader) ([]byte, int, error) {
-	buf, err := r.ReadSlice(' ')
+// ReadBytesUntilSpace reads bytes from the provided bufio.Reader until the first space character (' ')
+// is encountered. It returns the bytes read (excluding the trailing space), the total number of bytes
+// read, and any error encountered.
+func ReadBytesUntilSpace(reader *bufio.Reader) ([]byte, int, error) {
+	buf, err := reader.ReadBytes(' ')
 	if err != nil {
 		return buf, len(buf), err
 	}
-	if len(buf) > 0 {
-		return buf[:len(buf)-1], len(buf), nil
-	}
-	return buf, len(buf), nil
+	return buf[:len(buf)-1], len(buf), nil
 }
 
 // ReadBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
 // it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
 // and an error if one occurred
-func ReadBytesUntilSpaceOrNilValue(r *bufio.Reader, buf *bytes.Buffer) (int, error) {
-	buf.Reset()
-	tb := 0
+func ReadBytesUntilSpaceOrNilValue(reader *bufio.Reader, buffer *bytes.Buffer) (int, error) {
+	buffer.Reset()
+	bytesRead := 0
 	for {
-		b, err := r.ReadByte()
+		data, err := reader.ReadByte()
 		if err != nil {
-			return tb, err
+			return bytesRead, err
 		}
-		tb++
-		if b == ' ' {
-			return tb, nil
+		bytesRead++
+		if data == space {
+			return bytesRead, nil
 		}
-		if b == '-' && (buf.Len() > 0 && buf.Bytes()[tb-2] == ' ') {
-			return tb, nil
+		isNilValue := data == dash && buffer.Len() > 0 && buffer.Bytes()[buffer.Len()-1] == space
+		if isNilValue {
+			return bytesRead, nil
 		}
-		buf.WriteByte(b)
+		buffer.WriteByte(data)
 	}
 }
 
 // ParsePriority will try to parse the priority part of the RFC3164 header
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.1
-func ParsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
-	buf.Reset()
-	b, err := r.ReadByte()
+func ParsePriority(reader *bufio.Reader, buffer *bytes.Buffer, logMessage *LogMsg) error {
+	priority, err := readPriorityValue(reader, buffer)
 	if err != nil {
 		return err
 	}
-	if b != '<' {
-		return ErrWrongFormat
+
+	logMessage.Priority = Priority(priority)
+	logMessage.Facility = FacilityFromPrio(logMessage.Priority)
+	logMessage.Severity = SeverityFromPrio(logMessage.Priority)
+	return nil
+}
+
+// readPriorityValue reads and parses the priority value enclosed in angle brackets
+func readPriorityValue(reader *bufio.Reader, buffer *bytes.Buffer) (int, error) {
+	buffer.Reset()
+
+	data, err := reader.ReadByte()
+	if err != nil {
+		return 0, fmt.Errorf("error reading priority value: %w", err)
 	}
+	if data != lowerThan {
+		return 0, ErrWrongFormat
+	}
+
 	for {
-		b, err = r.ReadByte()
+		data, err = reader.ReadByte()
 		if err != nil {
-			return err
+			return 0, err
 		}
-		if b == '>' {
+		if data == greaterThan {
 			break
 		}
-		buf.WriteByte(b)
+		buffer.WriteByte(data)
 	}
-	p, err := strconv.Atoi(buf.String())
+
+	priority, err := strconv.Atoi(buffer.String())
 	if err != nil {
-		return ErrInvalidPrio
+		return 0, ErrInvalidPrio
 	}
-	lm.Priority = Priority(p)
-	lm.Facility = FacilityFromPrio(lm.Priority)
-	lm.Severity = SeverityFromPrio(lm.Priority)
-	return nil
+
+	return priority, nil
 }
