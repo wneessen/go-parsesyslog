@@ -33,8 +33,8 @@ func TestParseStringRFC5424(t *testing.T) {
 	if !bytes.Equal(l.MsgID, []byte("")) {
 		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
 	}
-	if l.ProcID != "" {
-		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "", l.ProcID)
+	if !bytes.Equal(l.PID, []byte("")) {
+		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "", l.PID)
 	}
 	if l.Message.String() != "Hello, World!" {
 		t.Errorf("ParseString() wrong message => expected: %s, got: %s", "Hello, World!",
@@ -78,8 +78,8 @@ func TestParseReaderRFC5424(t *testing.T) {
 	if !bytes.Equal(l.MsgID, []byte("")) {
 		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
 	}
-	if l.ProcID != "" {
-		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "", l.ProcID)
+	if !bytes.Equal(l.PID, []byte("")) {
+		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "", l.PID)
 	}
 	if l.Message.String() != "Hello, World!" {
 		t.Errorf("ParseString() wrong message => expected: %s, got: %s", "Hello, World!",
@@ -202,8 +202,8 @@ func TestRFC5424Msg_parseAppName(t *testing.T) {
 			if err := m.parseAppName(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if lm.AppName != tt.want {
-				t.Errorf("parseHostname() wrong = expected: %s, got: %s", tt.want, lm.AppName)
+			if !bytes.Equal(lm.App, []byte(tt.want)) {
+				t.Errorf("parseAppName() wrong = expected: %s, got: %s", tt.want, lm.App)
 			}
 		})
 	}
@@ -258,8 +258,8 @@ func TestRFC5424Msg_parseProcID(t *testing.T) {
 			if err := m.parseProcID(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if lm.ProcID != tt.want {
-				t.Errorf("parseHostname() wrong = expected: %s, got: %s", tt.want, lm.ProcID)
+			if !bytes.Equal(lm.PID, []byte(tt.want)) {
+				t.Errorf("parseProcID() wrong = expected: %s, got: %s", tt.want, lm.PID)
 			}
 		})
 	}

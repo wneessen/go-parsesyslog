@@ -280,7 +280,7 @@ func (m *msg) parseAppName(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	if m.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.AppName = m.buf.String()
+	lm.App = m.buf.Bytes()
 	return nil
 }
 
@@ -297,7 +297,7 @@ func (m *msg) parseProcID(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	if m.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.ProcID = m.buf.String()
+	lm.PID = m.buf.Bytes()
 	return nil
 }
 
