@@ -72,15 +72,14 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 	// Infer year from 'now' (common syslog heuristic):
 	// start with current year in loc; if parsed time is more than ~31 days in the future,
 	// assume it was from the previous year (handles Jan logs for Dec events).
-	now := time.Now()
-	loc := time.Local
-	year := now.In(loc).Year()
-	t := time.Date(year, time.Month(mon), day, hh, mm, ss, 0, loc)
+	now := time.Now().Local()
+	year := now.Year()
+	t := time.Date(year, time.Month(mon), day, hh, mm, ss, 0, time.Local)
 
 	// If this appears unreasonably in the future relative to 'now', roll back a year.
 	const futureSkew = 31 * 24 * time.Hour
 	if t.After(now.Add(futureSkew)) {
-		t = time.Date(year-1, time.Month(mon), day, hh, mm, ss, 0, loc)
+		t = time.Date(year-1, time.Month(mon), day, hh, mm, ss, 0, time.Local)
 	}
 
 	return t, nil
