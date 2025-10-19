@@ -18,9 +18,6 @@ const (
 	greaterThan = '>'
 )
 
-// ReadMsgLength reads the first bytes of the log message which represent the total length of
-// the log message
-
 // ReadMsgLength reads a space-delimited length prefix from the provided bufio.Reader, converts
 // it to an integer, and returns it.
 func ReadMsgLength(r *bufio.Reader) (int, error) {
