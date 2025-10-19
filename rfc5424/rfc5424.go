@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -220,7 +221,7 @@ func (m *msg) parseProtoVersion(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	if err != nil {
 		return err
 	}
-	pv, err := parsesyslog.Atoi(b)
+	pv, err := strconv.Atoi(string(b))
 	if err != nil {
 		return parsesyslog.ErrInvalidProtoVersion
 	}

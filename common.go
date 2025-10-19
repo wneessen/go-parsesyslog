@@ -7,18 +7,20 @@ package parsesyslog
 import (
 	"bufio"
 	"bytes"
-	"fmt"
-	"math"
+	"strconv"
 )
 
 // ReadMsgLength reads the first bytes of the log message which represent the total length of
 // the log message
+
+// ReadMsgLength reads a space-delimited length prefix from the provided bufio.Reader, converts
+// it to an integer, and returns it.
 func ReadMsgLength(r *bufio.Reader) (int, error) {
 	ls, _, err := ReadBytesUntilSpace(r)
 	if err != nil {
 		return 0, err
 	}
-	return Atoi(ls)
+	return strconv.Atoi(string(ls))
 }
 
 // ReadBytesUntilSpace is a helper method that takes a io.Reader and reads all bytes until it hits
@@ -78,7 +80,7 @@ func ParsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
 		}
 		buf.WriteByte(b)
 	}
-	p, err := Atoi(buf.Bytes())
+	p, err := strconv.Atoi(buf.String())
 	if err != nil {
 		return ErrInvalidPrio
 	}
@@ -86,19 +88,4 @@ func ParsePriority(r *bufio.Reader, buf *bytes.Buffer, lm *LogMsg) error {
 	lm.Facility = FacilityFromPrio(lm.Priority)
 	lm.Severity = SeverityFromPrio(lm.Priority)
 	return nil
-}
-
-// Atoi performs allocation free ASCII number to integer conversion
-func Atoi(b []byte) (int, error) {
-	z := 0
-	c := 0
-	for x := len(b); x > 0; x-- {
-		y := int(b[x-1]) - 0x30
-		if y > 10 {
-			return 0, fmt.Errorf("not a number: %s", string(b[x-1]))
-		}
-		z += y * int(math.Pow10(c))
-		c++
-	}
-	return z, nil
 }
