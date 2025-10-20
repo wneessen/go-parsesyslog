@@ -77,7 +77,7 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 	year := now.Year()
 	t := time.Date(year, time.Month(mon), day, hh, mm, ss, 0, time.Local)
 
-	// If this appears unreasonably in the future relative to 'now', roll back a year.
+	// If this appears unreasonably in the future relative to 'testNow', roll back a year.
 	const futureSkew = 31 * 24 * time.Hour
 	if t.After(now.Add(futureSkew)) {
 		t = time.Date(year-1, time.Month(mon), day, hh, mm, ss, 0, time.Local)
