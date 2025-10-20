@@ -43,8 +43,9 @@ var (
 	testNow = time.Now()
 	now     = time.Date(testNow.Year(), testNow.Month(), testNow.Day(), testNow.Hour(), testNow.Minute(),
 		testNow.Second(), 0, time.Local)
-	testMessage = `<165>` + testNow.Format("Jan") + " " + testNow.Format("_2") + " " +
-		testNow.Format("15") + ":" + testNow.Format("04") + ":" + testNow.Format("05") + " " +
+	testTimestamp = testNow.Format("Jan") + " " + testNow.Format("_2") + " " +
+		testNow.Format("15") + ":" + testNow.Format("04") + ":" + testNow.Format("05")
+	testMessage = `<165>` + testTimestamp + " " +
 		`mymachine myproc[10]: %% It's time to make the do-nuts.  %%  Ingredients: Mix=OK, Jelly=OK # Devices: ` +
 		`Mixer=OK, Jelly_Injector=OK, Frier=OK # Transport: Conveyer1=OK, Conveyer2=OK # %%` + "\n"
 )
