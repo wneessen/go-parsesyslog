@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+// SPDX-FileCopyrightText: Winni Neessen <wn@neessen.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -17,9 +17,9 @@ import (
 	"github.com/wneessen/go-parsesyslog"
 )
 
-// msg represents a log message in that matches RFC5424
-type msg struct {
-	buf bytes.Buffer
+// rfc5424 represents a log message in that matches RFC5424
+type rfc5424 struct {
+	buf *bytes.Buffer
 }
 
 // Type represents the ParserType for this Parser
@@ -28,91 +28,92 @@ const Type parsesyslog.ParserType = "rfc5424"
 // init registers the Parser
 func init() {
 	fn := func() (parsesyslog.Parser, error) {
-		return &msg{}, nil
+		return &rfc5424{
+			buf: bytes.NewBuffer(nil),
+		}, nil
 	}
 	parsesyslog.Register(Type, fn)
 }
 
 // ParseString returns the parsed log message read from a string (as buffered i/o)
-func (m *msg) ParseString(s string) (parsesyslog.LogMsg, error) {
+func (r *rfc5424) ParseString(s string) (parsesyslog.LogMsg, error) {
 	sr := strings.NewReader(s)
 	br := bufio.NewReader(sr)
-	return m.ParseReader(br)
+	return r.ParseReader(br)
 }
 
 // ParseReader is the parser function that is able to interpret RFC5424 and
 // satisfies the Parser interface
-func (m *msg) ParseReader(r io.Reader) (parsesyslog.LogMsg, error) {
-	l := parsesyslog.LogMsg{
+func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
+	logMessage := parsesyslog.LogMsg{
 		Type: parsesyslog.RFC5424,
 	}
 
-	br, ok := r.(*bufio.Reader)
+	bufReader, ok := reader.(*bufio.Reader)
 	if !ok {
-		br = bufio.NewReader(r)
+		bufReader = bufio.NewReader(reader)
 	}
-	ml, err := parsesyslog.ReadMsgLength(br)
+	ml, err := parsesyslog.ReadMsgLength(bufReader)
 	if err != nil {
-		return l, err
+		return logMessage, err
+	}
+	bufReader = bufio.NewReader(io.LimitReader(reader, int64(ml)))
+
+	if err = r.parseHeader(bufReader, &logMessage); err != nil {
+		return logMessage, r.handleParseError(err)
+	}
+	if err = r.parseStructuredData(bufReader, &logMessage); err != nil {
+		return logMessage, r.handleParseError(err)
 	}
 
-	lr := io.LimitReader(br, int64(ml))
-	br = bufio.NewReaderSize(lr, ml)
-	if err := m.parseHeader(br, &l); err != nil {
-		switch {
-		case errors.Is(err, io.EOF):
-			return l, parsesyslog.ErrPrematureEOF
-		default:
-			return l, err
-		}
-	}
-	if err := m.parseStructuredData(br, &l); err != nil {
-		switch {
-		case errors.Is(err, io.EOF):
-			return l, parsesyslog.ErrPrematureEOF
-		default:
-			return l, err
-		}
+	if err := r.parseBOM(bufReader, &logMessage); err != nil {
+		return logMessage, nil
 	}
 
-	if err := m.parseBOM(br, &l); err != nil {
-		return l, nil
-	}
-
-	// rb := make([]byte, ml - l.Message.Len())
-	md, err := io.ReadAll(br)
+	// rb := make([]byte, ml - logMessage.Message.Len())
+	md, err := io.ReadAll(bufReader)
 	if err != nil {
-		return l, err
+		return logMessage, err
 	}
-	l.Message.Write(md)
-	l.MsgLength = l.Message.Len()
 
-	return l, nil
+	logMessage.Message.Write(md)
+	logMessage.MsgLength = logMessage.Message.Len()
+
+	return logMessage, nil
+}
+
+// handleParseError converts io.EOF errors to ErrPrematureEOF and returns other errors as-is
+func (r *rfc5424) handleParseError(err error) error {
+	if errors.Is(err, io.EOF) {
+		return parsesyslog.ErrPrematureEOF
+	}
+	return err
 }
 
 // parseHeader will try to parse the header of a RFC5424 syslog message and store
 // it in the provided LogMsg pointer
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
-func (m *msg) parseHeader(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	if err := parsesyslog.ParsePriority(r, &m.buf, lm); err != nil {
+func (r *rfc5424) parseHeader(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
+	if err := parsesyslog.ParsePriority(reader, r.buf, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseProtoVersion(r, lm); err != nil {
+
+	if err := r.parseProtoVersion(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseTimestamp(r, lm); err != nil {
+	if err := r.parseTimestamp(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseHostname(r, lm); err != nil {
+	if err := r.parseHostname(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseAppName(r, lm); err != nil {
+	if err := r.parseAppName(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseProcID(r, lm); err != nil {
+	if err := r.parseProcID(reader, logMessage); err != nil {
 		return err
 	}
-	if err := m.parseMsgID(r, lm); err != nil {
+	if err := r.parseMsgID(reader, logMessage); err != nil {
 		return err
 	}
 
@@ -124,15 +125,15 @@ func (m *msg) parseHeader(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
 // We are using a simple finite state machine here to parse through the different
 // states of the parameters and elements
-func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	m.buf.Reset()
+func (r *rfc5424) parseStructuredData(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	r.buf.Reset()
 
-	nb, err := r.ReadByte()
+	nb, err := reader.ReadByte()
 	if err != nil {
 		return err
 	}
 	if nb == '-' {
-		_, err = r.ReadByte()
+		_, err = reader.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -149,7 +150,7 @@ func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error
 	insideparam := false
 	readname := false
 	for {
-		b, err := r.ReadByte()
+		b, err := reader.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -157,7 +158,7 @@ func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error
 			insideelem = false
 			sds = append(sds, sd)
 			sd = parsesyslog.StructuredDataElement{}
-			m.buf.Reset()
+			r.buf.Reset()
 			continue
 		}
 		if b == '[' {
@@ -167,12 +168,12 @@ func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error
 		}
 		if b == ' ' && !readname {
 			readname = true
-			sd.ID = m.buf.String()
-			m.buf.Reset()
+			sd.ID = r.buf.String()
+			r.buf.Reset()
 		}
 		if b == '=' && !insideparam {
-			sdp.Name = m.buf.String()
-			m.buf.Reset()
+			sdp.Name = r.buf.String()
+			r.buf.Reset()
 			continue
 		}
 		if b == '"' && !insideparam {
@@ -181,8 +182,8 @@ func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error
 		}
 		if b == '"' && insideparam {
 			insideparam = false
-			sdp.Value = m.buf.String()
-			m.buf.Reset()
+			sdp.Value = r.buf.String()
+			r.buf.Reset()
 			sd.Param = append(sd.Param, sdp)
 			sdp = parsesyslog.StructuredDataParam{}
 			continue
@@ -193,7 +194,7 @@ func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error
 		if b == ' ' && !insideparam {
 			continue
 		}
-		m.buf.WriteByte(b)
+		r.buf.WriteByte(b)
 	}
 	lm.StructuredData = sds
 
@@ -202,8 +203,8 @@ func (m *msg) parseStructuredData(r *bufio.Reader, lm *parsesyslog.LogMsg) error
 
 // parseBOM will try to parse the BOM (if any) of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.4
-func (m *msg) parseBOM(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	bom, err := r.Peek(3)
+func (r *rfc5424) parseBOM(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	bom, err := reader.Peek(3)
 	if err != nil {
 		return err
 	}
@@ -215,8 +216,8 @@ func (m *msg) parseBOM(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 
 // parseProtoVersion will try to parse the proto version part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.2
-func (m *msg) parseProtoVersion(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	b, _, err := parsesyslog.ReadBytesUntilSpace(r)
+func (r *rfc5424) parseProtoVersion(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	b, _, err := parsesyslog.ReadBytesUntilSpace(reader)
 	if err != nil {
 		return err
 	}
@@ -231,18 +232,18 @@ func (m *msg) parseProtoVersion(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 // parseTimestamp will try to parse the timestamp (or NILVALUE) part of the
 // RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.3
-func (m *msg) parseTimestamp(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
+func (r *rfc5424) parseTimestamp(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
 	if err != nil {
 		return err
 	}
-	if m.buf.Len() == 0 {
+	if r.buf.Len() == 0 {
 		return nil
 	}
-	if m.buf.Bytes()[0] == '-' {
+	if r.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	ts, err := time.Parse(time.RFC3339, m.buf.String())
+	ts, err := time.Parse(time.RFC3339, r.buf.String())
 	if err != nil {
 		return parsesyslog.ErrInvalidTimestamp
 	}
@@ -252,68 +253,68 @@ func (m *msg) parseTimestamp(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
 
 // parseHostname will try to read the hostname part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.4
-func (m *msg) parseHostname(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
+func (r *rfc5424) parseHostname(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
 	if err != nil {
 		return err
 	}
-	if m.buf.Len() == 0 {
+	if r.buf.Len() == 0 {
 		return nil
 	}
-	if m.buf.Bytes()[0] == '-' {
+	if r.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.Host = m.buf.Bytes()
+	lm.Host = r.buf.Bytes()
 	return nil
 }
 
 // parseAppName will try to read the app name part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.5
-func (m *msg) parseAppName(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
+func (r *rfc5424) parseAppName(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
 	if err != nil {
 		return err
 	}
-	if m.buf.Len() == 0 {
+	if r.buf.Len() == 0 {
 		return nil
 	}
-	if m.buf.Bytes()[0] == '-' {
+	if r.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.App = m.buf.Bytes()
+	lm.App = r.buf.Bytes()
 	return nil
 }
 
 // parseProcID will try to read the process ID part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.6
-func (m *msg) parseProcID(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
+func (r *rfc5424) parseProcID(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
 	if err != nil {
 		return err
 	}
-	if m.buf.Len() == 0 {
+	if r.buf.Len() == 0 {
 		return nil
 	}
-	if m.buf.Bytes()[0] == '-' {
+	if r.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.PID = m.buf.Bytes()
+	lm.PID = r.buf.Bytes()
 	return nil
 }
 
 // parseMsgID will try to read the message ID part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.7
-func (m *msg) parseMsgID(r *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(r, &m.buf)
+func (r *rfc5424) parseMsgID(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
 	if err != nil {
 		return err
 	}
-	if m.buf.Len() == 0 {
+	if r.buf.Len() == 0 {
 		return nil
 	}
-	if m.buf.Bytes()[0] == '-' {
+	if r.buf.Bytes()[0] == '-' {
 		return nil
 	}
-	lm.MsgID = m.buf.Bytes()
+	lm.MsgID = r.buf.Bytes()
 	return nil
 }
