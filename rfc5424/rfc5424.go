@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 // rfc5424 represents a log message in that matches RFC5424
 type rfc5424 struct {
 	buf *bytes.Buffer
+	sds []parsesyslog.StructuredDataElement
 }
 
 // Type represents the ParserType for this Parser
@@ -30,6 +32,7 @@ func init() {
 	fn := func() (parsesyslog.Parser, error) {
 		return &rfc5424{
 			buf: bytes.NewBuffer(nil),
+			sds: make([]parsesyslog.StructuredDataElement, 0),
 		}, nil
 	}
 	parsesyslog.Register(Type, fn)
@@ -57,21 +60,22 @@ func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 	if err != nil {
 		return logMessage, err
 	}
-	bufReader = bufio.NewReader(io.LimitReader(reader, int64(ml)))
+	msgReader := bufio.NewReader(io.LimitReader(bufReader, int64(ml)))
 
-	if err = r.parseHeader(bufReader, &logMessage); err != nil {
-		return logMessage, r.handleParseError(err)
-	}
-	if err = r.parseStructuredData(bufReader, &logMessage); err != nil {
+	if err = r.parseHeader(msgReader, &logMessage); err != nil {
 		return logMessage, r.handleParseError(err)
 	}
 
-	if err = r.parseBOM(bufReader, &logMessage); err != nil {
+	if err = r.parseStructuredData(msgReader, &logMessage); err != nil {
+		return logMessage, r.handleParseError(err)
+	}
+
+	if err = r.parseBOM(msgReader, &logMessage); err != nil {
 		return logMessage, nil
 	}
 
 	// rb := make([]byte, ml - logMessage.Message.Len())
-	md, err := io.ReadAll(bufReader)
+	md, err := io.ReadAll(msgReader)
 	if err != nil {
 		return logMessage, err
 	}
@@ -125,80 +129,169 @@ func (r *rfc5424) parseHeader(reader *bufio.Reader, logMessage *parsesyslog.LogM
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
 // We are using a simple finite state machine here to parse through the different
 // states of the parameters and elements
-func (r *rfc5424) parseStructuredData(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
+	r.sds = r.sds[:0]
 	r.buf.Reset()
 
-	nb, err := reader.ReadByte()
+	nextByte, err := reader.ReadByte()
 	if err != nil {
 		return err
 	}
-	if nb == '-' {
-		_, err = reader.ReadByte()
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	if nb != '[' {
-		return parsesyslog.ErrWrongSDFormat
-	}
 
-	var sds []parsesyslog.StructuredDataElement
-	var sd parsesyslog.StructuredDataElement
-	var sdp parsesyslog.StructuredDataParam
-	insideelem := true
-	insideparam := false
-	readname := false
-	for {
+	// Handle NILVALUE: "-"
+	if nextByte == '-' {
+		// Check if the NILVALUE is correctly followed by a space or EOF
 		b, err := reader.ReadByte()
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				logMessage.StructuredData = nil
+				return nil
+			}
 			return err
 		}
-		if b == ']' {
-			insideelem = false
-			sds = append(sds, sd)
-			sd = parsesyslog.StructuredDataElement{}
-			r.buf.Reset()
-			continue
-		}
-		if b == '[' {
-			insideelem = true
-			readname = false
-			continue
-		}
-		if b == ' ' && !readname {
-			readname = true
-			sd.ID = r.buf.String()
-			r.buf.Reset()
-		}
-		if b == '=' && !insideparam {
-			sdp.Name = r.buf.String()
-			r.buf.Reset()
-			continue
-		}
-		if b == '"' && !insideparam {
-			insideparam = true
-			continue
-		}
-		if b == '"' && insideparam {
-			insideparam = false
-			sdp.Value = r.buf.String()
-			r.buf.Reset()
-			sd.Param = append(sd.Param, sdp)
-			sdp = parsesyslog.StructuredDataParam{}
-			continue
-		}
-		if b == ' ' && !insideelem {
-			break
-		}
-		if b == ' ' && !insideparam {
-			continue
-		}
-		r.buf.WriteByte(b)
-	}
-	lm.StructuredData = sds
 
-	return nil
+		// Invalid NILVALUE: Must be followed by space. Unread both and return error.
+		if b != ' ' {
+			_ = reader.UnreadByte()
+			_ = reader.UnreadByte()
+			return parsesyslog.ErrWrongSDFormat
+		}
+
+		// Found valid NILVALUE: "- ". We consumed the space, which is correct because
+		// the stream is now positioned at the start of the MSG body.
+		logMessage.StructuredData = nil
+		return nil
+	}
+
+	// Structured data must start with '['
+	if nextByte != '[' {
+		return parsesyslog.ErrWrongSDFormat
+	}
+	r.buf.WriteByte(nextByte)
+
+	var sdContent []byte
+	var inQuotes bool
+	var depth = 1
+
+	for {
+		data, err := reader.ReadByte()
+		if err != nil {
+			// If EOF is hit, the structured data block was the last thing. Process the buffer contents.
+			if errors.Is(err, io.EOF) {
+				sdContent = r.buf.Bytes()
+				break
+			}
+			return err
+		}
+		r.buf.WriteByte(data)
+
+		// Toggle quoted state
+		if data == '"' {
+			inQuotes = !inQuotes
+		}
+
+		if !inQuotes {
+			if data == ' ' && depth == 0 {
+				// Found the space that terminates the SD section.
+				// We have read one byte too far (' '). Unread it.
+				if err = reader.UnreadByte(); err != nil {
+					return fmt.Errorf("failed to unread byte: %w", err)
+				}
+
+				// Trim the space from the buffer content as well.
+				sdContent = r.buf.Bytes()[:r.buf.Len()-1]
+				break
+			}
+			if data == '[' {
+				depth++
+				continue
+			}
+			if data == ']' {
+				depth--
+				continue
+			}
+		}
+
+		// Closing bracket without an opening one would be a malformed structured data block.
+		if depth < 0 {
+			return parsesyslog.ErrWrongSDFormat
+		}
+	}
+
+	// message now holds the contiguous slice of SD bytes read from the stream.
+	message := sdContent
+
+	if len(message) < 2 || message[0] != '[' || message[len(message)-1] != ']' {
+		// We have a malformed SD block.
+		if len(message) != 0 {
+			return parsesyslog.ErrWrongSDFormat
+		}
+		// We no structued data block at all.
+		return nil
+	}
+
+	var sd parsesyslog.StructuredDataElement
+	var sdp parsesyslog.StructuredDataParam
+	var start = 1
+	insideValue := false
+
+	for i := 1; i < len(message); i++ {
+		b := message[i]
+
+		if b == '"' {
+			switch insideValue {
+			case true:
+				sdp.Value = message[start:i]
+				sd.Param = append(sd.Param, sdp)
+				sdp = parsesyslog.StructuredDataParam{}
+				insideValue = false
+				start = i + 1
+			default:
+				insideValue = true
+				start = i + 1
+			}
+			continue
+		}
+
+		if !insideValue {
+			if b == '=' {
+				sdp.Name = message[start:i]
+				start = i + 1
+				continue
+			}
+
+			if b == ' ' || b == ']' {
+				if b == ']' {
+					if sd.ID == nil {
+						sd.ID = message[start:i]
+					}
+
+					r.sds = append(r.sds, sd)
+					sd = parsesyslog.StructuredDataElement{} // Reset for next element
+					start = i + 1
+
+					// If content remains, it must be the start of a new element.
+					if start < len(message) && message[start] == '[' {
+						start++
+						continue
+					}
+					break
+				}
+
+				if sd.ID == nil {
+					sd.ID = message[start:i]
+					start = i + 1
+					continue
+				}
+				start = i + 1
+				continue
+			}
+		}
+	}
+
+	logMessage.StructuredData = r.sds
+	_, err = reader.ReadByte()
+	return err
 }
 
 // parseBOM will try to parse the BOM (if any) of the RFC54524 header

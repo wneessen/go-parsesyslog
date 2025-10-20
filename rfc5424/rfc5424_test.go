@@ -38,7 +38,7 @@ func TestParseStringRFC5424(t *testing.T) {
 		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "", l.PID)
 	}
 	if l.Message.String() != "Hello, World!" {
-		t.Errorf("ParseString() wrong message => expected: %s, got: %s", "Hello, World!",
+		t.Errorf("ParseString() wrong message => expected: %q, got: %q", "Hello, World!",
 			l.Message.String())
 	}
 	if l.Priority != 7 {
@@ -136,9 +136,9 @@ func TestRFC5424Msg_parseTimestamp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			m := &rfc5424{}
+			parser := testRFC5424Parser(t)
 			lm := &parsesyslog.LogMsg{}
-			if err := m.parseTimestamp(br, lm); (err != nil) != tt.wantErr {
+			if err := parser.parseTimestamp(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseTimestamp() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if lm.Timestamp.UTC().Format(tf) != tt.want {
@@ -170,9 +170,9 @@ func TestRFC5424Msg_parseHostname(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			m := &rfc5424{}
+			parser := testRFC5424Parser(t)
 			lm := &parsesyslog.LogMsg{}
-			if err := m.parseHostname(br, lm); (err != nil) != tt.wantErr {
+			if err := parser.parseHostname(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !bytes.Equal(lm.Host, []byte(tt.want)) {
@@ -198,9 +198,9 @@ func TestRFC5424Msg_parseAppName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			m := &rfc5424{}
+			parser := testRFC5424Parser(t)
 			lm := &parsesyslog.LogMsg{}
-			if err := m.parseAppName(br, lm); (err != nil) != tt.wantErr {
+			if err := parser.parseAppName(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !bytes.Equal(lm.App, []byte(tt.want)) {
@@ -226,9 +226,9 @@ func TestRFC5424Msg_parseMsgID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			m := &rfc5424{}
+			parser := testRFC5424Parser(t)
 			lm := &parsesyslog.LogMsg{}
-			if err := m.parseMsgID(br, lm); (err != nil) != tt.wantErr {
+			if err := parser.parseMsgID(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !bytes.Equal(lm.MsgID, []byte(tt.want)) {
@@ -254,9 +254,9 @@ func TestRFC5424Msg_parseProcID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			m := &rfc5424{}
+			parser := testRFC5424Parser(t)
 			lm := &parsesyslog.LogMsg{}
-			if err := m.parseProcID(br, lm); (err != nil) != tt.wantErr {
+			if err := parser.parseProcID(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseHostname() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !bytes.Equal(lm.PID, []byte(tt.want)) {
@@ -310,9 +310,9 @@ func TestRFC5424Msg_parseStructuredData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sr := strings.NewReader(tt.msg)
 			br := bufio.NewReader(sr)
-			m := &rfc5424{}
+			parser := testRFC5424Parser(t)
 			lm := &parsesyslog.LogMsg{}
-			if err := m.parseStructuredData(br, lm); (err != nil) != tt.wantErr {
+			if err := parser.parseStructuredData(br, lm); (err != nil) != tt.wantErr {
 				t.Errorf("parseStructuredData() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if len(lm.StructuredData) != tt.wantElemCount {
@@ -326,9 +326,20 @@ func TestRFC5424Msg_parseStructuredData(t *testing.T) {
 			pn := false
 			for _, en := range tt.wantName {
 				for _, e := range lm.StructuredData {
-					if en == e.ID {
+					t.Logf("ID: %s", e.ID)
+					for _, p := range e.Param {
+						t.Logf("Param Name: %s", p.Name)
+						t.Logf("Param Value: %s", p.Value)
+					}
+					if bytes.Equal(e.ID, []byte(en)) {
 						pn = true
 					}
+
+					/*
+						if strings.EqualFold(e.ID, en) {
+							pn = true
+						}
+					*/
 				}
 			}
 			if !pn {
@@ -342,7 +353,7 @@ func TestRFC5424Msg_parseStructuredData(t *testing.T) {
 				pf := false
 				for _, ei := range tt.wantElemID {
 					for _, p := range lm.StructuredData[e].Param {
-						if p.Name == ei {
+						if bytes.Equal(p.Name, []byte(ei)) {
 							pf = true
 						}
 					}
@@ -401,4 +412,12 @@ func BenchmarkParseStringRFC5424(b *testing.B) {
 		}
 	}
 	_ = lm
+}
+
+func testRFC5424Parser(t *testing.T) *rfc5424 {
+	t.Helper()
+	return &rfc5424{
+		buf: bytes.NewBuffer(nil),
+		sds: make([]parsesyslog.StructuredDataElement, 0),
+	}
 }

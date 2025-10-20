@@ -44,15 +44,15 @@ type ProtoVersion int
 // StructuredDataElement represents a structured data element in an RFC5424 Syslog message.
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3.1
 type StructuredDataElement struct {
-	ID    string
+	ID    []byte
 	Param []StructuredDataParam
 }
 
 // StructuredDataParam represents a key-value pair within a Structured Data element of an RFC5424 Syslog message.
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3.3
 type StructuredDataParam struct {
-	Name  string
-	Value string
+	Name  []byte
+	Value []byte
 }
 
 func (l *LogMsg) Hostname() string {
