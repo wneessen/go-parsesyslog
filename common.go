@@ -70,6 +70,9 @@ func ParsePriority(reader *bufio.Reader, buffer *bytes.Buffer, logMessage *LogMs
 	if err != nil {
 		return err
 	}
+	if priority < 0 || priority > 191 {
+		return ErrInvalidPrio
+	}
 
 	logMessage.Priority = Priority(priority)
 	logMessage.Facility = FacilityFromPrio(logMessage.Priority)
