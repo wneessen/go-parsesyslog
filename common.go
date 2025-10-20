@@ -43,6 +43,15 @@ func ReadBytesUntilSpace(reader *bufio.Reader) ([]byte, int, error) {
 // ReadBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
 // it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
 // and an error if one occurred
+// isNilValuePattern checks if the current byte completes a NILVALUE pattern (" -")
+// NILVALUE is represented as a dash preceded by a space
+func isNilValuePattern(currentByte byte, buffer *bytes.Buffer) bool {
+	return currentByte == dash && buffer.Len() > 0 && buffer.Bytes()[buffer.Len()-1] == space
+}
+
+// ReadBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
+// it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
+// and an error if one occurred
 func ReadBytesUntilSpaceOrNilValue(reader *bufio.Reader, buffer *bytes.Buffer) (int, error) {
 	buffer.Reset()
 	bytesRead := 0
@@ -52,13 +61,12 @@ func ReadBytesUntilSpaceOrNilValue(reader *bufio.Reader, buffer *bytes.Buffer) (
 			return bytesRead, err
 		}
 		bytesRead++
-		if data == space {
+
+		isTerminator := data == space || isNilValuePattern(data, buffer)
+		if isTerminator {
 			return bytesRead, nil
 		}
-		isNilValue := data == dash && buffer.Len() > 0 && buffer.Bytes()[buffer.Len()-1] == space
-		if isNilValue {
-			return bytesRead, nil
-		}
+
 		buffer.WriteByte(data)
 	}
 }
