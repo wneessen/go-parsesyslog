@@ -16,39 +16,36 @@ var (
 	// ErrBadMonth indicates the timestamp does not match the expected month format.
 	ErrBadMonth = errors.New("timestamp does not match expected month format")
 	// ErrBadNumber indicates an invalid number in the timestamp, such as day or numeric values out of range.
-	ErrBadNumber = errors.New("invalid number in timestamp: must be 1..31 or 1..9")
-	// ErrOutOfRange indicates the minutes in the timestamp are out of range (must be 0 to 59).
-	ErrOutOfRange = errors.New("timestamp minutes out of range: must be 0..59")
+	ErrBadNumber = errors.New("invalid number in timestamp")
+	// ErrOutOfRange indicates that a timestamp value exceeds acceptable bounds, such as day, hour, minute,
+	// or second limits.
+	ErrOutOfRange = errors.New("timestamp value out of range")
 )
 
-// ParseTimestamp parses an RFC3164 timestamp of the form "Mmm dd HH:MM:SS".
-// Example: "Oct 19 14:32:01"
-// - b must be at least 15 bytes and match the exact layout.
-// - now is used to infer the year (RFC3164 omits the year).
-// - loc is the time zone to use (often time.Local).
-// On the hot success path, this function performs zero allocations.
-// See: https://tools.ietf.org/search/rfc3164#section-4.1.2
+// ParseTimestamp parses a timestamp in the fixed RFC3164 format and returns a time.Time instance and error
+// if applicable.
+//
+// The input must strictly match the expected format and length (15 bytes), or it returns ErrBadLength or
+// ErrBadFormat. It validates components like month, day, hour, minute, and second, returning specific errors for
+// format or range issues. The year is inferred based on the current time to handle logs near the beginning of
+// a new year.
 func ParseTimestamp(b []byte) (time.Time, error) {
-	// Expected fixed layout: "Mmm dd HH:MM:SS" -> len 15
-	// 012345678901234
-	// Mmm d d HH:MM:SS  (day may be space-padded)
 	if len(b) != timestampLength {
 		return time.Time{}, ErrBadLength
 	}
-	// Structural checks
 	if b[3] != ' ' || b[6] != ' ' || b[9] != ':' || b[12] != ':' {
 		return time.Time{}, ErrBadFormat
 	}
 
-	// Month (b[0:3])
-	mon, ok := parseMonth(b[0], b[1], b[2])
-	if !ok {
+	// Parse the month (b[0:2])
+	mon := parseMonth(b[0], b[1], b[2])
+	if mon == -1 {
 		return time.Time{}, ErrBadMonth
 	}
 
 	// Day (b[4:6]) where b[4] may be ' ' for 1..9
-	day, ok := parseDay(b[4], b[5])
-	if !ok {
+	day := parseDay(b[4], b[5])
+	if day == -1 {
 		return time.Time{}, ErrBadNumber
 	}
 	if day < 1 || day > 31 {
@@ -56,22 +53,22 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 	}
 
 	// Hour, Min, Sec (must be digits)
-	hh, ok := parse2(b[7], b[8])
-	if !ok || hh > 23 {
+	hh := parseDoubleDigit(b[7], b[8])
+	if hh <= -1 || hh > 23 {
 		return time.Time{}, ErrOutOfRange
 	}
-	mm, ok := parse2(b[10], b[11])
-	if !ok || mm > 59 {
+	mm := parseDoubleDigit(b[10], b[11])
+	if mm <= -1 || mm > 59 {
 		return time.Time{}, ErrOutOfRange
 	}
-	ss, ok := parse2(b[13], b[14])
-	if !ok || ss > 60 { // allow leap second 60
+	ss := parseDoubleDigit(b[13], b[14])
+	if ss <= -1 || ss > 60 { // Allow leap seconds
 		return time.Time{}, ErrOutOfRange
 	}
 
-	// Infer year from 'now' (common syslog heuristic):
-	// start with current year in loc; if parsed time is more than ~31 days in the future,
-	// assume it was from the previous year (handles Jan logs for Dec events).
+	// Infer year from current local time (common syslog heuristic):
+	// if parsed time is more than ~31 days in the future, assume it was from the previous year (handles Jan
+	// logs for Dec events).
 	now := time.Now().Local()
 	year := now.Year()
 	t := time.Date(year, time.Month(mon), day, hh, mm, ss, 0, time.Local)
@@ -85,72 +82,77 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 	return t, nil
 }
 
-func parseMonth(a, b, c byte) (int, bool) {
-	// Compare ASCII directly; avoids any allocation or strings.
+// parseMonth parses three byte inputs representing the abbreviated month name and returns the numeric month (1-12).
+// Returns -1 if the input does not match any valid month abbreviation.
+func parseMonth(a, b, c byte) int {
 	switch a {
 	case 'J':
 		if b == 'a' && c == 'n' { // Jan
-			return 1, true
+			return 1
 		}
 		if b == 'u' && c == 'n' { // Jun
-			return 6, true
+			return 6
 		}
 		if b == 'u' && c == 'l' { // Jul
-			return 7, true
+			return 7
 		}
 	case 'F':
 		if b == 'e' && c == 'b' { // Feb
-			return 2, true
+			return 2
 		}
 	case 'M':
 		if b == 'a' && c == 'r' { // Mar
-			return 3, true
+			return 3
 		}
 		if b == 'a' && c == 'y' { // May
-			return 5, true
+			return 5
 		}
 	case 'A':
 		if b == 'p' && c == 'r' { // Apr
-			return 4, true
+			return 4
 		}
 		if b == 'u' && c == 'g' { // Aug
-			return 8, true
+			return 8
 		}
 	case 'S':
 		if b == 'e' && c == 'p' { // Sep
-			return 9, true
+			return 9
 		}
 	case 'O':
 		if b == 'c' && c == 't' { // Oct
-			return 10, true
+			return 10
 		}
 	case 'N':
 		if b == 'o' && c == 'v' { // Nov
-			return 11, true
+			return 11
 		}
 	case 'D':
 		if b == 'e' && c == 'c' { // Dec
-			return 12, true
+			return 12
 		}
 	}
-	return 0, false
+	return -1
 }
 
-func parse2(a, b byte) (int, bool) {
-	if a < '0' || a > '9' || b < '0' || b > '9' {
-		return 0, false
-	}
-	return int(a-'0')*10 + int(b-'0'), true
-}
-
-func parseDay(a, b byte) (int, bool) {
+// parseDay parses two byte inputs representing a day (space-padded for 1-9 or both digits for 10-31).
+// Returns -1 if the inputs are invalid.
+func parseDay(a, b byte) int {
 	// day is space-padded for 1..9: " 1".." 9" or "10".."31"
 	if a == ' ' {
 		if b < '0' || b > '9' {
-			return 0, false
+			return -1
 		}
-		return int(b - '0'), true
+		return int(b - '0')
 	}
+
 	// both digits
-	return parse2(a, b)
+	return parseDoubleDigit(a, b)
+}
+
+// parseDoubleDigit parses two byte inputs representing a two-digit number (00-69). Returns -1 for invalid inputs.
+func parseDoubleDigit(a, b byte) int {
+	if a < '0' || a > '6' || b < '0' || b > '9' {
+		return -1
+	}
+	return int(a-'0')*10 + int(b-'0')
 }
