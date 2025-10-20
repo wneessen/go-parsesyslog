@@ -18,7 +18,8 @@ timestamp parsing and optional tags.
 is "[no ending delimiter to this part](https://tools.ietf.org/search/rfc3164#section-4.1.3)"
 for this reason we are using the newline (`\n` (ASCII: 10)) as delimiter. This will therefore truncate messages that
 have a newline in it. Additionally the RFC does specify a timestamp format that has not provide any information about
-the year. For this reason, we will interpret the year for the message as the current year.
+the year. For this reason, we infer the year from current local time. If the parsed time is more than ~31 days in 
+the future, assume it was from the previous year, otherwise we assume it is from the current year.
 
 Available fields in the `LogMsg`:
 
