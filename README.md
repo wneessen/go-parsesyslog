@@ -193,12 +193,12 @@ quite some work has been invested to make `go-parsesyslog` fast and memory effic
 as possible and make use of buffered I/O where possible.
 
 ```shell
-$ go test -run=X -bench=.\*ParseReader -benchtime=5s ./...
+$ go test -run=X -bench=.\*ParseReader -benchtime=15s ./...
 goos: linux
 goarch: amd64
 pkg: github.com/wneessen/go-parsesyslog
 cpu: AMD Ryzen 9 3950X 16-Core Processor
-BenchmarkRFC3164Msg_ParseReader-2        7971660               748.9 ns/op            96 B/op          4 allocs/op
+BenchmarkRFC3164Msg_ParseReader-32      36159258               497.7 ns/op            64 B/op          1 allocs/op
 BenchmarkRFC5424Msg_ParseReader-2        3458671              1734 ns/op            1144 B/op         16 allocs/op
 PASS
 ```
