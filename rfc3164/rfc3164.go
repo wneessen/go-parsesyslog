@@ -70,7 +70,10 @@ func (r *rfc3164) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 	}
 	r.reol = false
 
-	bufreader := bufio.NewReaderSize(reader, 1024)
+	bufreader, ok := reader.(*bufio.Reader)
+	if !ok {
+		bufreader = bufio.NewReaderSize(reader, 1024)
+	}
 	if err := r.parseHeader(bufreader, &logMessage); err != nil {
 		switch {
 		case errors.Is(err, io.EOF):
