@@ -66,7 +66,7 @@ func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 		return logMessage, r.handleParseError(err)
 	}
 
-	if err := r.parseBOM(bufReader, &logMessage); err != nil {
+	if err = r.parseBOM(bufReader, &logMessage); err != nil {
 		return logMessage, nil
 	}
 
