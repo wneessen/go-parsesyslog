@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -80,14 +81,14 @@ func (r *rfc3164) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 	}
 
 	if !r.reol {
-		rd, err := bufreader.ReadSlice('\n')
+		data, err := bufreader.ReadSlice('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
-			return logMessage, err
+			return logMessage, fmt.Errorf("failed to read bytes: %w", err)
 		}
 
-		_, err = logMessage.Message.Write(rd)
+		_, err = logMessage.Message.Write(data)
 		if err != nil {
-			return logMessage, err
+			return logMessage, fmt.Errorf("failed to write bytes: %w", err)
 		}
 	}
 	logMessage.MsgLength = logMessage.Message.Len()
@@ -166,13 +167,13 @@ func (r *rfc3164) parseTag(reader *bufio.Reader, logMessage *parsesyslog.LogMsg)
 		if err != nil {
 			return err
 		}
-		r.buf.WriteByte(b)
-		bytesRead++
-
 		if b == newlineChar {
 			r.reol = true
 			break
 		}
+		r.buf.WriteByte(b)
+		bytesRead++
+
 		if b == spaceChar {
 			break
 		}
