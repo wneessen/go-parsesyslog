@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: Winni Neessen <wn@neessen.dev>
+//
+// SPDX-License-Identifier: MIT
+
 package rfc5424
 
 import (
@@ -107,7 +111,7 @@ func TestRfc5424_ParseReader(t *testing.T) {
 			t.Errorf("expected message to be: %q, got: %q", expectMsg, logMessage.Message.String())
 		}
 
-		//mymachine app 12345 ID47
+		// mymachine app 12345 ID47
 		expectApp := "app"
 		if !strings.EqualFold(logMessage.AppName(), expectApp) {
 			t.Errorf("expected app name to be: %q, got: %q", expectApp, logMessage.AppName())
