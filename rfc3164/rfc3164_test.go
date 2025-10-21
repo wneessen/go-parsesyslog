@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2021-2023 Winni Neessen <wn@neessen.dev>
+// SPDX-FileCopyrightText: Winni Neessen <wn@neessen.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,155 +10,284 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wneessen/go-parsesyslog"
 )
 
-// TestParseStringRFC3164 tests the NewRFC3164Parser method together with the ParseString
-// method (which implies ParseReader as well)
-func TestParseStringRFC3164(t *testing.T) {
-	p, err := parsesyslog.New(Type)
-	if err != nil {
-		t.Errorf("failed to create new RFC3164 parser")
-		return
-	}
-	msg := "<13>Nov 27 16:00:35 arch-vm wneessen[1130275]: test\n"
-	l, err := p.ParseString(msg)
-	if err != nil {
-		t.Errorf("failed to parse message: %s", err)
-	}
-	if l.MsgLength != 5 {
-		t.Errorf("ParseString() wrong msg length => expected: %d, got: %d", 5, l.MsgLength)
-	}
-	if l.MsgID != "" {
-		t.Errorf("ParseString() wrong msg ID => expected: %s, got: %s", "", l.MsgID)
-	}
-	if l.ProcID != "1130275" {
-		t.Errorf("ParseString() wrong proc ID => expected: %s, got: %s", "1130275", l.ProcID)
-	}
-	if l.Message.String() != "test\n" {
-		t.Errorf("ParseString() wrong message => expected: %q, got: %q", "test\n", l.Message.String())
-	}
-	if l.Priority != 13 {
-		t.Errorf("ParseString() wrong priority => expected: %d, got: %d", 13, l.Priority)
-	}
-	if l.Facility != 1 {
-		t.Errorf("ParseString() wrong facility => expected: %d, got: %d", 1, l.Facility)
-	}
-	if l.Severity != 5 {
-		t.Errorf("ParseString() wrong severity => expected: %d, got: %d", 5, l.Severity)
-	}
-	if l.Timestamp.UTC().Format("01-02 15:04:05") != "11-27 16:00:35" {
-		t.Errorf("ParseString() wrong timestamp => expected: %s, got: %s", "11-27 16:00:35",
-			l.Timestamp.UTC().Format("01-02 15:04:05"))
-	}
-}
-
-// TestRFC3164Msg_parseTag tests the parseTag method of the msg type
-func TestRFC3164Msg_parseTag(t *testing.T) {
-	tests := []struct {
-		name     string
-		msg      string
-		want     string
-		wantpid  string
-		wantErr  bool
-		wantText string
+var (
+	tests = []struct {
+		Name  string
+		Line  string
+		Valid bool
 	}{
-		{
-			"valid tag with pid", `syslog-ng[1122680]: Test123`, `syslog-ng`, `1122680`,
-			false, `Test123`,
-		},
-		{"valid tag no pid", `su: Test123`, `su`, ``, false, `Test123`},
-		{"no tag", `This is a test `, ``, ``, false, `This is a test `},
-		{"mark", "-- MARK --\n", ``, ``, false, "-- MARK --\n"},
+		{"basic_tag_pid", "<34>Oct 20 12:34:56 myhost app[123]: hello world", true},
+		{"basic_tag_pid_newline", "<34>Oct 20 12:34:56 myhost app[123]: hello world\n", true},
+		{"single_digit_day_space_padded", "<13>Jan  2 03:04:05 host tag: message", true},
+		{"double_digit_day", "<13>Jan 12 03:04:05 host tag: message", true},
+		{"ipv4_hostname", "<13>Mar 15 11:22:33 192.0.2.1 app: payload", true},
+		{"ipv6_hostname", "<13>Apr 01 00:00:00 2001:db8::1 app: boot", true},
+		{"tag_without_pid", "<11>May 31 23:59:59 gw tag: done", true},
+		{"unicode_in_msg", "<14>Jun 07 07:08:09 srv app: wärme ✓", true},
+		{"maxish_tag_length_32", "<14>Jul 10 10:10:10 host AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: x", true},
+		{"pri_with_leading_zero", "<013>Aug 09 09:09:09 host app: ok", true},
+		{"missing_pri_closer", "<13Sep 09 09:09:09 host app: nope", false},
+		{"non_numeric_pri", "<ab>Sep 09 09:09:09 host app: nope", false},
+		{"pri_out_of_range_192", "<192>Sep 09 09:09:09 host app: nope", false},
+		{"invalid_month_token", "<13>Foo 12 03:04:05 host app: nope", false},
+		{"day_zero", "<13>Jan 00 03:04:05 host app: nope", false},
+		{"hour_24", "<13>Jan 12 24:00:00 host app: nope", false},
+		{"missing_hostname", "<13>Jan 12 03:04:05 app: nope", false},
+		{"no_space_after_colon", "<13>Jan 12 03:04:05 host app:message", false},
 	}
-	for _, tt := range tests {
-		sr := strings.NewReader(tt.msg)
-		br := bufio.NewReader(sr)
-		t.Run(tt.name, func(t *testing.T) {
-			m := &msg{}
-			lm := &parsesyslog.LogMsg{}
-			if err := m.parseTag(br, lm); (err != nil) != tt.wantErr {
-				t.Errorf("parseTag() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if lm.Message.String() != tt.wantText {
-				t.Errorf("parseTag() wrong msg => want: %q, got: %q", tt.wantText, lm.Message.String())
-			}
-			if lm.AppName != tt.want {
-				t.Errorf("parseTag() wrong app => want: %q, got: %q", tt.want, lm.AppName)
-			}
-			if lm.ProcID != tt.wantpid {
-				t.Errorf("parseTag() wrong pid => want: %s, got: %s", tt.wantpid, lm.ProcID)
-			}
-		})
+
+	testNow = time.Now()
+	now     = time.Date(testNow.Year(), testNow.Month(), testNow.Day(), testNow.Hour(), testNow.Minute(),
+		testNow.Second(), 0, time.Local)
+	testTimestamp = testNow.Format("Jan") + " " + testNow.Format("_2") + " " +
+		testNow.Format("15") + ":" + testNow.Format("04") + ":" + testNow.Format("05")
+	testMessage = `<165>` + testTimestamp + " " +
+		`mymachine myproc[10]: %% It's time to make the do-nuts.  %%  Ingredients: Mix=OK, Jelly=OK # Devices: ` +
+		`Mixer=OK, Jelly_Injector=OK, Frier=OK # Transport: Conveyer1=OK, Conveyer2=OK # %%` + "\n"
+)
+
+func TestRfc3164_ParseReader(t *testing.T) {
+	parser, initErr := parsesyslog.New(Type)
+	if initErr != nil {
+		t.Fatalf("failed to create new RFC3164 parser: %s", initErr)
 	}
+	t.Run("parse different valid and invalid log messages", func(t *testing.T) {
+		for _, tc := range tests {
+			stringReader := strings.NewReader(tc.Line)
+			bufReader := bufio.NewReader(stringReader)
+			t.Run(tc.Name, func(t *testing.T) {
+				_, err := parser.ParseReader(bufReader)
+				if err != nil && tc.Valid {
+					t.Errorf("failed to parse message: %s", err)
+				}
+				if err == nil && !tc.Valid {
+					t.Errorf("log message should have caused an error, but it didn't")
+				}
+			})
+		}
+	})
+	t.Run("parsing short log message should fail", func(t *testing.T) {
+		stringReader := strings.NewReader("<13>Jan 12 03:04:05 ")
+		bufReader := bufio.NewReader(stringReader)
+		_, err := parser.ParseReader(bufReader)
+		if err == nil {
+			t.Errorf("log message should have caused an error, but it didn't")
+		}
+		if !errors.Is(err, parsesyslog.ErrPrematureEOF) {
+			t.Errorf("expected error to be: %s, got: %s", parsesyslog.ErrPrematureEOF, err)
+		}
+	})
+	t.Run("parsing empty message should fail", func(t *testing.T) {
+		stringReader := strings.NewReader("")
+		bufReader := bufio.NewReader(stringReader)
+		_, err := parser.ParseReader(bufReader)
+		if err == nil {
+			t.Errorf("log message should have caused an error, but it didn't")
+		}
+		if !errors.Is(err, parsesyslog.ErrPrematureEOF) {
+			t.Errorf("expected error to be: %s, got: %s", parsesyslog.ErrPrematureEOF, err)
+		}
+	})
+	t.Run("parsing message with incomplete timestamp should fail", func(t *testing.T) {
+		stringReader := strings.NewReader("<13>Jan 12 03:04")
+		bufReader := bufio.NewReader(stringReader)
+		_, err := parser.ParseReader(bufReader)
+		if err == nil {
+			t.Errorf("log message should have caused an error, but it didn't")
+		}
+		if !errors.Is(err, parsesyslog.ErrPrematureEOF) {
+			t.Errorf("expected error to be: %s, got: %s", parsesyslog.ErrPrematureEOF, err)
+		}
+	})
+	t.Run("parsing message with no trailing space after timestamp should fail", func(t *testing.T) {
+		stringReader := strings.NewReader("<13>Jan 12 03:04:59")
+		bufReader := bufio.NewReader(stringReader)
+		_, err := parser.ParseReader(bufReader)
+		if err == nil {
+			t.Errorf("log message should have caused an error, but it didn't")
+		}
+		if !strings.EqualFold(err.Error(), "failed to discard space") {
+			t.Errorf("expected error to be: %s, got: %s", "failed to discard space", err)
+		}
+	})
+	t.Run("parsing message with newline in tag should interpret it as message", func(t *testing.T) {
+		stringReader := strings.NewReader("<13>Jan 12 03:04:59 mymachine mypro\n")
+		bufReader := bufio.NewReader(stringReader)
+		logMessage, err := parser.ParseReader(bufReader)
+		if err != nil {
+			t.Errorf("failed to parse message: %s", err)
+		}
+		expect := "mypro"
+		if !strings.EqualFold(logMessage.Message.String(), expect) {
+			t.Errorf("expected message to be: %q, got: %q", expect, logMessage.Message.String())
+		}
+	})
+	t.Run("parsing message fails with non io.EOF error", func(t *testing.T) {
+		stringReader := newMockReader(testMessage)
+		bufReader := bufio.NewReader(stringReader)
+		_, err := parser.ParseReader(bufReader)
+		if err == nil {
+			t.Errorf("log message should have caused an error, but it didn't")
+		}
+		if !errors.Is(err, ErrFinished) {
+			t.Errorf("expected error to be: %s, got: %s", ErrFinished, err)
+		}
+	})
+	t.Run("parsing tag fails with non io.EOF error", func(t *testing.T) {
+		stringReader := newMockReader("<13>Jan 12 03:04:59 mymachine mypro foo")
+		bufReader := bufio.NewReader(stringReader)
+		_, err := parser.ParseReader(bufReader)
+		if err == nil {
+			t.Errorf("log message should have caused an error, but it didn't")
+		}
+		if !errors.Is(err, ErrFinished) {
+			t.Errorf("expected error to be: %s, got: %s", ErrFinished, err)
+		}
+	})
+	t.Run("parsing valid message should provide the correct values", func(t *testing.T) {
+		stringReader := strings.NewReader(testMessage)
+		bufReader := bufio.NewReader(stringReader)
+		logMessage, err := parser.ParseReader(bufReader)
+		if err != nil {
+			t.Fatalf("failed to parse message: %s", err)
+		}
+
+		if !strings.EqualFold(logMessage.Message.String(), testMessage[43:]) {
+			t.Errorf("expected message to be: %s, got: %s", testMessage[43:], logMessage.Message.String())
+		}
+		if logMessage.Facility != 20 {
+			t.Errorf("expected facility to be: %d, got: %d", 20, logMessage.Facility)
+		}
+		if logMessage.Severity != 5 {
+			t.Errorf("expected severity to be: %d, got: %d", 5, logMessage.Severity)
+		}
+		if !logMessage.Timestamp.Equal(now) {
+			t.Errorf("expected timestamp to be: %s, got: %s", now, logMessage.Timestamp)
+		}
+
+		appname := "myproc"
+		if !strings.EqualFold(logMessage.AppName(), appname) {
+			t.Errorf("expected app name to be: %s, got: %s", appname, logMessage.AppName())
+		}
+
+		hostname := "mymachine"
+		if !strings.EqualFold(logMessage.Hostname(), hostname) {
+			t.Errorf("expected hostname to be: %s, got: %s", hostname, logMessage.Hostname())
+		}
+
+		pid := "10"
+		if !strings.EqualFold(logMessage.ProcID(), pid) {
+			t.Errorf("expected pid to be: %s, got: %s", pid, logMessage.ProcID())
+		}
+
+		facility := "LOCAL4"
+		if !strings.EqualFold(logMessage.Facility.String(), facility) {
+			t.Errorf("expected facility to be: %s, got: %s", facility, logMessage.Facility.String())
+		}
+
+		severity := "NOTICE"
+		if !strings.EqualFold(logMessage.Severity.String(), severity) {
+			t.Errorf("expected severity to be: %s, got: %s", severity, logMessage.Severity.String())
+		}
+	})
 }
 
-// TestRFC3164Msg_ParseReader tests the ParseReader method of the msg type
-func TestRFC3164Msg_ParseReader(t *testing.T) {
-	sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8")
-	br := bufio.NewReader(sr)
-	m := msg{}
-
-	lm, err := m.ParseReader(br)
+func TestRfc3164_ParseString(t *testing.T) {
+	parser, err := parsesyslog.New(Type)
 	if err != nil {
-		t.Errorf("failed to parse RFC3164 message: %s", err)
+		t.Fatalf("failed to create new RFC3164 parser: %s", err)
 	}
-	_ = lm
+	t.Run("parse different valid and invalid log messages", func(t *testing.T) {
+		for _, tc := range tests {
+			t.Run(tc.Name, func(t *testing.T) {
+				_, err = parser.ParseString(tc.Line)
+				if err != nil && tc.Valid {
+					t.Errorf("failed to parse message: %s", err)
+				}
+				if err == nil && !tc.Valid {
+					t.Errorf("log message should have caused an error, but it didn't")
+				}
+			})
+		}
+	})
 }
 
-// BenchmarkRFC3164Msg_ParseReader benchmarks the ParseReader method of the msg type
+// BenchmarkRFC3164Msg_ParseReader benchmarks the ParseReader method of the rfc3164 type
 func BenchmarkRFC3164Msg_ParseReader(b *testing.B) {
-	b.ReportAllocs()
-	sr := strings.NewReader("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n")
+	msg := "<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8\n"
+	sr := strings.NewReader(msg)
 	br := bufio.NewReader(sr)
-	var lm parsesyslog.LogMsg
-	var err error
 
 	p, err := parsesyslog.New(Type)
 	if err != nil {
 		b.Errorf("failed to create new RFC3164 parser")
 		return
 	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		lm, err = p.ParseReader(br)
-		if err != nil && !errors.Is(err, io.EOF) {
-			b.Errorf("failed to read bytes: %s", err)
-			break
+	b.Run("ParseReader", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = p.ParseReader(br)
+			if err != nil && !errors.Is(err, io.EOF) {
+				b.Errorf("failed to read bytes: %s", err)
+				break
+			}
+			_, _ = sr.Seek(0, io.SeekStart)
 		}
-		_, err := sr.Seek(0, io.SeekStart)
-		if err != nil {
-			b.Errorf("failed to seek back to start: %s", err)
-			break
-		}
-		br.Reset(sr)
-	}
-	_ = lm
+	})
 }
 
 // BenchmarkParseStringRFC3164 benchmarks the ParseReader method of the RFC3164Msg type
 func BenchmarkParseStringRFC3164(b *testing.B) {
-	b.ReportAllocs()
-	msg := `<165>Aug 24 05:34:00 mymachine myproc[10]: %% It's time to make the do-nuts.  %%  Ingredients: Mix=OK, Jelly=OK # Devices: Mixer=OK, Jelly_Injector=OK, Frier=OK # Transport: Conveyer1=OK, Conveyer2=OK # %%
-`
-	var lm parsesyslog.LogMsg
-	var err error
+	msg := `<165>Aug 24 05:34:00 mymachine myproc[10]: %% It's time to make the do-nuts.  %%  Ingredients: Mix=OK, Jelly=OK # Devices: Mixer=OK, Jelly_Injector=OK, Frier=OK # Transport: Conveyer1=OK, Conveyer2=OK # %%` + "\n"
 
 	p, err := parsesyslog.New(Type)
 	if err != nil {
 		b.Errorf("failed to create new RFC3164 parser")
 		return
 	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		lm, err = p.ParseString(msg)
-		if err != nil {
-			b.Errorf("failed to read bytes: %s", err)
-			break
+	b.Run("ParseString", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = p.ParseString(msg)
+			if err != nil {
+				b.Errorf("failed to read bytes: %s", err)
+				break
+			}
 		}
+	})
+}
+
+// ErrFinished is returned when the mock reader runs out of data.
+// It is distinct from io.EOF so you can detect it in tests.
+var ErrFinished = errors.New("mock reader finished")
+
+// MockReader implements io.Reader and returns ErrFinished when done.
+type mockReader struct {
+	data []byte
+	pos  int
+}
+
+// NewMockReader creates a new MockReader with the given data.
+func newMockReader(data string) *mockReader {
+	return &mockReader{data: []byte(data[:len(data)-1])}
+}
+
+func (r *mockReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.data) {
+		return 0, ErrFinished // custom error instead of io.EOF
 	}
-	_ = lm
+
+	n := copy(p, r.data[r.pos:])
+	r.pos += n
+	if r.pos >= len(r.data) {
+		return n, ErrFinished
+	}
+	return n, nil
 }

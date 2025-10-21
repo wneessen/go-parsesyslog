@@ -18,7 +18,8 @@ timestamp parsing and optional tags.
 is "[no ending delimiter to this part](https://tools.ietf.org/search/rfc3164#section-4.1.3)"
 for this reason we are using the newline (`\n` (ASCII: 10)) as delimiter. This will therefore truncate messages that
 have a newline in it. Additionally the RFC does specify a timestamp format that has not provide any information about
-the year. For this reason, we will interpret the year for the message as the current year.
+the year. For this reason, we infer the year from current local time. If the parsed time is more than ~31 days in 
+the future, assume it was from the previous year, otherwise we assume it is from the current year.
 
 Available fields in the `LogMsg`:
 
@@ -193,12 +194,12 @@ quite some work has been invested to make `go-parsesyslog` fast and memory effic
 as possible and make use of buffered I/O where possible.
 
 ```shell
-$ go test -run=X -bench=.\*ParseReader -benchtime=5s ./...
+$ go test -run=X -bench=.\*ParseReader -benchtime=15s ./...
 goos: linux
 goarch: amd64
 pkg: github.com/wneessen/go-parsesyslog
 cpu: AMD Ryzen 9 3950X 16-Core Processor
-BenchmarkRFC3164Msg_ParseReader-2        7971660               748.9 ns/op            96 B/op          4 allocs/op
-BenchmarkRFC5424Msg_ParseReader-2        3458671              1734 ns/op            1144 B/op         16 allocs/op
+BenchmarkRFC3164Msg_ParseReader/ParseReader-32     36575746       490 ns/op     64 B/op    1 allocs/op
+BenchmarkRFC5424Msg_ParseReader/ParseReader-32     12615361      1433 ns/op    432 B/op    5 allocs/op
 PASS
 ```

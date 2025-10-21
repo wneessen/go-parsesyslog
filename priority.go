@@ -76,7 +76,8 @@ func SeverityStringFromPrio(p Priority) string {
 	return SeverityFromPrio(p).String()
 }
 
-// String satisfies the fmt.Stringer interface for the Facility type
+// String returns the string representation of the Facility based on its integer value. It satisfies the fmt.Stringer
+// interface.
 func (f Facility) String() string {
 	switch f {
 	case 0:
@@ -132,7 +133,7 @@ func (f Facility) String() string {
 	}
 }
 
-// String satisfies the fmt.Stringer interface for the Severity type
+// String returns the string representation of the Severity enumeration. It satisfies the fmt.Stringer interface.
 func (s Severity) String() string {
 	switch s {
 	case 0:

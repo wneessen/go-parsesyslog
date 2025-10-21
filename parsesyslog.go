@@ -12,46 +12,43 @@ import (
 )
 
 var (
-	// lock protects the types during Register()
+	// lock ensures thread-safe access to the types map during registration operations.
 	lock sync.RWMutex
 
-	// types is a map of installed message parser types, supplying a function that
-	// creates a new instance of that Parser.
-	types = map[ParserType]func() (Parser, error){}
+	// types is a registry mapping ParserType to factory functions that create new Parser instances.
+	types = map[ParserType]newFunc{}
 )
 
-// Parser is an interface for parsing log messages.
+// Parser defines an interface for parsing Syslog messages from various input sources into LogMsg objects.
 type Parser interface {
 	ParseReader(io.Reader) (LogMsg, error)
 	ParseString(s string) (LogMsg, error)
 }
 
-// ParserType is a type of parser for logs messages
+// newFunc is a function type that defines a factory for creating a new Parser instance, returning the
+// Parser and an error.
+type newFunc func() (Parser, error)
+
+// ParserType is an alias type for a string. It represents a type of parser used to process and
+// interpret log messages.
 type ParserType string
 
-// Register registers a new ParserType with its corresponding
-// Parser function.
-func Register(t ParserType, fn func() (Parser, error)) {
+// Register adds a new parser factory function for a specified ParserType if it is not already registered.
+func Register(parserType ParserType, newFunc newFunc) {
 	lock.Lock()
 	defer lock.Unlock()
-	// if already registered, leave
-	if _, ok := types[t]; ok {
+	if _, ok := types[parserType]; ok {
 		return
 	}
-	types[t] = fn
+	types[parserType] = newFunc
 }
 
-// New returns a Parser of the specified ParserType and an error.
-// It looks up the ParserType in the types map and if found,
-// calls the corresponding Parser function to create a new Parser
-// instance.
-//
-// If the ParserType is not found in the map, it returns nil
-// and ErrParserTypeUnknown.
+// New creates a new Parser instance based on the provided ParserType.
+// Returns an error if the requested ParserType is not registered.
+// The ParserType must correspond to a key in the internal types registry.
 func New(t ParserType) (Parser, error) {
-	p, ok := types[t]
-	if !ok {
-		return nil, ErrParserTypeUnknown
+	if newParser, ok := types[t]; ok {
+		return newParser()
 	}
-	return p()
+	return nil, ErrParserTypeUnknown
 }
