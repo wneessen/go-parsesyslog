@@ -54,6 +54,7 @@ var (
 		`59 <34>1 2025-10-21T15:30:00Z h a p m [id k="oops ] here"] bad`, // unescaped ']'
 		`53 <34>1 2025-10-21T15:30:00Z h a p m [bad id k="v"] bad`,       // space in SD-ID
 		`48 <34>1 2025-10-21T15:30:00Z h a p m [id k="v" bad`,            // unclosed SD
+		`46 <34>1 2025-10-21T15:30:00Z h a p m [v="]"]] bad`,             // unopened SD
 		`48 <34>1 2025-10-21T15:30:00Z h a p m [id ="v"] bad`,            // empty param name
 		`35 <14>1 - - - - - [id@1 k="v"] hello`,                          // message too short
 	}
@@ -176,6 +177,161 @@ func TestRfc5424_ParseReader(t *testing.T) {
 	})
 }
 
+func TestRfc5424_parseBOM(t *testing.T) {
+	t.Run("parsing BOM with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseBOM(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+}
+
+func TestRfc5424_parseMessageLength(t *testing.T) {
+	t.Run("parsing length with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+
+		if _, err := parser.parseMessageLength(brokenReader); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+}
+
+func TestRfc5424_parsePriority(t *testing.T) {
+	t.Run("parsing priority with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parsePriority(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing priority with invalid value should fail", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("<193>"))
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		err := parser.parsePriority(reader, logMessage)
+		if err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+		if err != nil && !errors.Is(err, parsesyslog.ErrInvalidPrio) {
+			t.Errorf("expected error to be: %s, got: %s", parsesyslog.ErrInvalidPrio, err)
+		}
+	})
+}
+
+func TestRfc5424_parseProtoVersion(t *testing.T) {
+	t.Run("parsing protocol version with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseProtoVersion(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing protocol version with invalid value should fail", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("0 "))
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		err := parser.parseProtoVersion(reader, logMessage)
+		if err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+		if err != nil && !errors.Is(err, parsesyslog.ErrInvalidProtoVersion) {
+			t.Errorf("expected error to be: %s, got: %s", parsesyslog.ErrInvalidProtoVersion, err)
+		}
+	})
+}
+
+func TestRfc5424_parseTimestamp(t *testing.T) {
+	t.Run("parsing timestamp with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseTimestamp(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing timestamp with invalid value should fail", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("2025-10-21T15:30 "))
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		err := parser.parseTimestamp(reader, logMessage)
+		if err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+		if err != nil && !errors.Is(err, parsesyslog.ErrInvalidTimestamp) {
+			t.Errorf("expected error to be: %s, got: %s", parsesyslog.ErrInvalidTimestamp, err)
+		}
+	})
+}
+
+func TestRfc5424_parseHostname(t *testing.T) {
+	t.Run("parsing hostname with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseHostname(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+}
+
+func TestRfc5424_parseAppName(t *testing.T) {
+	t.Run("parsing app name with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseAppName(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+}
+
+func TestRfc5424_parseProcID(t *testing.T) {
+	t.Run("parsing proc ID with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseProcID(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+}
+
+func TestRfc5424_parseMsgID(t *testing.T) {
+	t.Run("parsing message ID with broken reader should fail", func(t *testing.T) {
+		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseMsgID(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+}
+
 // BenchmarkRFC3164Msg_ParseReader benchmarks the ParseReader method of the rfc3164 type
 func BenchmarkRFC5424Msg_ParseReader(b *testing.B) {
 	msg := `151 <34>1 2025-10-21T15:30:00Z mymachine app 12345 ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"] An application event log entry`
@@ -199,4 +355,21 @@ func BenchmarkRFC5424Msg_ParseReader(b *testing.B) {
 			_, _ = sr.Seek(0, io.SeekStart)
 		}
 	})
+}
+
+func testRFC5424Parser(t *testing.T) *rfc5424 {
+	t.Helper()
+	return &rfc5424{
+		buf:   bytes.NewBuffer(nil),
+		arena: make([]byte, 0, 2048),
+		sds:   make([]parsesyslog.StructuredDataElement, 0),
+	}
+}
+
+// failReader is a reader that always returns an error on Read.
+type failReader struct{}
+
+// Read returns an error on every call. It satisfies the io.Reader interface.
+func (f failReader) Read([]byte) (n int, err error) {
+	return 0, errors.New("intentionally failing")
 }
