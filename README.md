@@ -199,7 +199,7 @@ goos: linux
 goarch: amd64
 pkg: github.com/wneessen/go-parsesyslog
 cpu: AMD Ryzen 9 3950X 16-Core Processor
-BenchmarkRFC3164Msg_ParseReader-32      36159258               497.7 ns/op            64 B/op          1 allocs/op
-BenchmarkRFC5424Msg_ParseReader-2        3458671              1734 ns/op            1144 B/op         16 allocs/op
+BenchmarkRFC3164Msg_ParseReader/ParseReader-32     36575746       490 ns/op     64 B/op    1 allocs/op
+BenchmarkRFC5424Msg_ParseReader/ParseReader-32     12615361      1433 ns/op    432 B/op    5 allocs/op
 PASS
 ```
