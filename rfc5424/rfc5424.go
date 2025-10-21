@@ -495,12 +495,7 @@ func (r *rfc5424) sliceFrom(start int) []byte {
 }
 
 func (r *rfc5424) readUntil(reader *bufio.Reader, until byte, include bool) error {
-	stopNext := false
 	for {
-		if stopNext {
-			break
-		}
-
 		p, err := reader.Peek(1)
 		if err != nil {
 			return err
@@ -516,20 +511,33 @@ func (r *rfc5424) readUntil(reader *bufio.Reader, until byte, include bool) erro
 				r.len++
 				break
 			}
-			stopNext = true
+
+			if err = r.readByte(reader); err != nil {
+				return err
+			}
+			break
 		}
 
-		_, err = reader.ReadByte()
-		if err != nil {
+		if err = r.readByte(reader); err != nil {
 			return err
 		}
-		if r.offset >= cap(r.arena) {
-			return parsesyslog.ErrWrongFormat
-		}
-		r.arena = r.arena[:r.offset+1]
-		r.arena[r.offset] = c
-		r.offset++
-		r.len++
 	}
+	return nil
+}
+
+func (r *rfc5424) readByte(reader *bufio.Reader) error {
+	c, err := reader.ReadByte()
+	if err != nil {
+		return err
+	}
+
+	if r.offset >= cap(r.arena) {
+		return parsesyslog.ErrWrongFormat
+	}
+
+	r.arena = r.arena[:r.offset+1]
+	r.arena[r.offset] = c
+	r.offset++
+	r.len++
 	return nil
 }
