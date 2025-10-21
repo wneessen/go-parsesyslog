@@ -22,7 +22,7 @@ var (
 		`151 <34>1 2025-10-21T15:30:00Z mymachine app 12345 ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"] An application event log entry`,
 
 		// NIL SD, IPv4 host, BOM-prefixed message (BOM = 3 bytes)
-		`82 <165>1 2003-10-11T22:14:15.003Z 192.0.2.1 evntslog - ID47 - ` + string([]byte{0xEF, 0xBB, 0xBF}) + `BOM-prefixed message`,
+		`83 <165>1 2003-10-11T22:14:15.003Z 192.0.2.1 evntslog - ID47 - ` + string([]byte{0xEF, 0xBB, 0xBF}) + `BOM-prefixed message`,
 
 		// Multiple SD elements + tz offset + microseconds
 		`120 <165>1 2003-08-24T05:14:15.000003-07:00 myhost su - ID47 [meta@123 foo="bar"][example@9999 a="b" c="d"] multi-SD message`,
@@ -55,8 +55,52 @@ var (
 		`53 <34>1 2025-10-21T15:30:00Z h a p m [bad id k="v"] bad`,       // space in SD-ID
 		`48 <34>1 2025-10-21T15:30:00Z h a p m [id k="v" bad`,            // unclosed SD
 		`48 <34>1 2025-10-21T15:30:00Z h a p m [id ="v"] bad`,            // empty param name
+		`35 <14>1 - - - - - [id@1 k="v"] hello`,                          // message too short
 	}
 )
+
+func TestRfc5424_ParseString(t *testing.T) {
+	type testCase struct {
+		name      string
+		input     string
+		isInvalid bool
+	}
+
+	var tests []testCase
+	for i, s := range valid {
+		tests = append(tests, testCase{
+			name:      fmt.Sprintf("valid/%d", i),
+			input:     s,
+			isInvalid: false,
+		})
+	}
+	for i, s := range invalid {
+		tests = append(tests, testCase{
+			name:      fmt.Sprintf("invalid/%d", i),
+			input:     s,
+			isInvalid: true,
+		})
+	}
+	parser, err := parsesyslog.New(Type)
+	if err != nil {
+		t.Errorf("failed to create new RFC5424 parser")
+		return
+	}
+
+	t.Run("parse different log valid/invalid log messages", func(t *testing.T) {
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				_, err := parser.ParseString(tc.input)
+				if err != nil && !tc.isInvalid {
+					t.Errorf("failed to parse log message: %s", err)
+				}
+				if err == nil && tc.isInvalid {
+					t.Errorf("log message %q should have caused an error, but it didn't", tc.input)
+				}
+			})
+		}
+	})
+}
 
 func TestRfc5424_ParseReader(t *testing.T) {
 	type testCase struct {
