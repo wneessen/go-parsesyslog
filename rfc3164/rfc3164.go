@@ -34,15 +34,17 @@ const (
 	// maxTagLength defines the maximum length for a tag in an RFC3164 syslog message.
 	maxTagLength = 32
 	// colonSeparator represents the colon character ':' used as a delimiter in RFC3164 syslog message parsing.
-	colonSeparator = 58
+	colon = 58
 	// spaceChar represents the space character used as a delimiter in parsing RFC3164 syslog messages.
-	spaceChar = 32
+	space = 32
 	// newlineChar defines the newline character used to detect the end of a line in RFC3164 syslog message parsing.
-	newlineChar = 10
+	newline = 10
 	// leftBracket represents the opening square bracket character used in parsing or formatting operations.
 	leftBracket = 91
 	// rightBracket represents the closing square bracket character used in parsing or formatting operations.
 	rightBracket = 93
+	lowerThan    = '<'
+	greaterThan  = '>'
 )
 
 // init registers the Parser with go-parsesyslog
@@ -103,7 +105,7 @@ func (r *rfc3164) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 // it in the provided LogMsg pointer
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
 func (r *rfc3164) parseHeader(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
-	if err := parsesyslog.ParsePriority(reader, r.buf, logMessage); err != nil {
+	if err := r.parsePriority(reader, r.buf, logMessage); err != nil {
 		return err
 	}
 	if err := r.parseTimestamp(reader, logMessage); err != nil {
@@ -116,6 +118,23 @@ func (r *rfc3164) parseHeader(reader *bufio.Reader, logMessage *parsesyslog.LogM
 		return err
 	}
 
+	return nil
+}
+
+// parsePriority will try to parse the priority part of the RFC3164 header
+// See: https://tools.ietf.org/search/rfc3164#section-4.1.1
+func (r *rfc3164) parsePriority(reader *bufio.Reader, buffer *bytes.Buffer, logMessage *parsesyslog.LogMsg) error {
+	priority, err := readPriorityValue(reader, buffer)
+	if err != nil {
+		return err
+	}
+	if priority < 0 || priority > 191 {
+		return parsesyslog.ErrInvalidPrio
+	}
+
+	logMessage.Priority = parsesyslog.Priority(priority)
+	logMessage.Facility = parsesyslog.FacilityFromPrio(logMessage.Priority)
+	logMessage.Severity = parsesyslog.SeverityFromPrio(logMessage.Priority)
 	return nil
 }
 
@@ -145,11 +164,12 @@ func (r *rfc3164) parseTimestamp(reader *bufio.Reader, logMessage *parsesyslog.L
 // See: https://tools.ietf.org/search/rfc3164#section-4.1.2
 func (r *rfc3164) parseHostname(reader *bufio.Reader, logMessage *parsesyslog.LogMsg) error {
 	r.buf.Reset()
-	hostname, _, err := parsesyslog.ReadBytesUntilSpace(reader)
+
+	buf, err := reader.ReadSlice(' ')
 	if err != nil {
 		return err
 	}
-	logMessage.Host = hostname
+	logMessage.Host = buf[:len(buf)-1]
 
 	return nil
 }
@@ -170,17 +190,17 @@ func (r *rfc3164) parseTag(reader *bufio.Reader, logMessage *parsesyslog.LogMsg)
 		if err != nil {
 			return err
 		}
-		if b == newlineChar {
+		if b == newline {
 			r.reol = true
 			break
 		}
 		r.buf.WriteByte(b)
 		bytesRead++
 
-		if b == spaceChar {
+		if b == space {
 			break
 		}
-		if b == colonSeparator {
+		if b == colon {
 			hasColon = true
 			continue
 		}
@@ -230,10 +250,41 @@ func (r *rfc3164) readMessageContent(reader *bufio.Reader, logMessage *parsesysl
 			return err
 		}
 		logMessage.Message.WriteByte(b)
-		if b == newlineChar {
+		if b == newline {
 			r.reol = true
 			break
 		}
 	}
 	return nil
+}
+
+// readPriorityValue reads and parses the priority value enclosed in angle brackets
+func readPriorityValue(reader *bufio.Reader, buffer *bytes.Buffer) (int, error) {
+	buffer.Reset()
+
+	data, err := reader.ReadByte()
+	if err != nil {
+		return 0, fmt.Errorf("error reading priority value: %w", err)
+	}
+	if data != lowerThan {
+		return 0, parsesyslog.ErrWrongFormat
+	}
+
+	for {
+		data, err = reader.ReadByte()
+		if err != nil {
+			return 0, err
+		}
+		if data == greaterThan {
+			break
+		}
+		buffer.WriteByte(data)
+	}
+
+	priority, err := parsesyslog.ParseUintBytes(buffer.Bytes())
+	if err != nil {
+		return 0, parsesyslog.ErrInvalidPrio
+	}
+
+	return priority, nil
 }

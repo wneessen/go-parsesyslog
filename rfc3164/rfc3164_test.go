@@ -22,6 +22,7 @@ var (
 		Valid bool
 	}{
 		{"basic_tag_pid", "<34>Oct 20 12:34:56 myhost app[123]: hello world", true},
+		{"basic_tag_pid_newline", "<34>Oct 20 12:34:56 myhost app[123]: hello world\n", true},
 		{"single_digit_day_space_padded", "<13>Jan  2 03:04:05 host tag: message", true},
 		{"double_digit_day", "<13>Jan 12 03:04:05 host tag: message", true},
 		{"ipv4_hostname", "<13>Mar 15 11:22:33 192.0.2.1 app: payload", true},

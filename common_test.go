@@ -5,66 +5,42 @@
 package parsesyslog
 
 import (
-	"bufio"
-	"bytes"
-	"io"
-	"strings"
+	"fmt"
 	"testing"
 )
 
-// Test_readBytesUntilSpace tests the ReadBytesUntilSpace helper method
-func Test_readBytesUntilSpace(t *testing.T) {
-	tests := []struct {
-		name    string
-		msg     string
-		bytes   []byte
-		length  int
-		wantErr bool
-	}{
-		{"successfully read 3 bytes", `123 test`, []byte("123"), 4, false},
-		{"successfully read 1 bytes", `1 test`, []byte("1"), 2, false},
-		{"empty read to EOF", ``, []byte{}, 0, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sr := strings.NewReader(tt.msg)
-			br := bufio.NewReader(sr)
-			got, got1, err := ReadBytesUntilSpace(br)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadBytesUntilSpace() error = %v, wantErr %v", err, tt.wantErr)
-				return
+func TestParseUintBytes(t *testing.T) {
+	t.Run("parse one digit number", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			raw := []byte(fmt.Sprintf("%d", i))
+			val, err := ParseUintBytes(raw)
+			if err != nil {
+				t.Errorf("failed to parse uint bytes: %s", err)
 			}
-			if !bytes.Equal(got, tt.bytes) {
-				t.Errorf("ReadBytesUntilSpace() got = %v, want %v", got, tt.bytes)
+			if val != i {
+				t.Errorf("expected value to be: %d, got: %d", i, val)
 			}
-			if got1 != tt.length {
-				t.Errorf("ReadBytesUntilSpace() got1 = %v, want %v", got1, tt.length)
-			}
-		})
-	}
-}
-
-// Benchmark_readBytesUntilSpace benchmarks the ReadBytesUntilSpace helper method
-func Benchmark_readBytesUntilSpace(b *testing.B) {
-	b.ReportAllocs()
-	sr := strings.NewReader("1234 ")
-	br := bufio.NewReader(sr)
-	var ba []byte
-	var l int
-	var err error
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ba, l, err = ReadBytesUntilSpace(br)
-		if err != nil {
-			b.Errorf("failed to read bytes: %s", err)
-			break
 		}
-		_, err := sr.Seek(0, io.SeekStart)
+	})
+	t.Run("parse big number", func(t *testing.T) {
+		want := 1234567890
+		raw := []byte(fmt.Sprintf("%d", want))
+		val, err := ParseUintBytes(raw)
 		if err != nil {
-			b.Errorf("failed to seek back to start: %s", err)
-			break
+			t.Errorf("failed to parse uint bytes: %s", err)
 		}
-	}
-	_, _ = ba, l
+		if val != want {
+			t.Errorf("expected value to be: %d, got: %d", want, val)
+		}
+	})
+	t.Run("no number should fail", func(t *testing.T) {
+		if _, err := ParseUintBytes([]byte("")); err == nil {
+			t.Errorf("parsing empty string should have failed, but it didn't")
+		}
+	})
+	t.Run("non-number should fail", func(t *testing.T) {
+		if _, err := ParseUintBytes([]byte("a")); err == nil {
+			t.Errorf("parsing a non-number string should have failed, but it didn't")
+		}
+	})
 }

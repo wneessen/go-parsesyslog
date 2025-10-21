@@ -21,5 +21,8 @@ var (
 	ErrWrongFormat = errors.New("log message does not conform the logging format")
 	// ErrWrongSDFormat should be used in case the structured data is not parsable
 	ErrWrongSDFormat = errors.New("structured data does not conform the format")
+	// ErrInvalidLength should be used if the length of the log message does not match the provided length
 	ErrInvalidLength = errors.New("log message does not match the provided length value")
+	// ErrInvalidNumber should be used if the number is not valid
+	ErrInvalidNumber = errors.New("invalid number")
 )
