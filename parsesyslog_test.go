@@ -4,7 +4,77 @@
 
 package parsesyslog
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
+
+func TestParseUintBytes(t *testing.T) {
+	t.Run("parse one digit number", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			raw := []byte(fmt.Sprintf("%d", i))
+			val, err := ParseUintBytes(raw)
+			if err != nil {
+				t.Errorf("failed to parse uint bytes: %s", err)
+			}
+			if val != i {
+				t.Errorf("expected value to be: %d, got: %d", i, val)
+			}
+		}
+	})
+	t.Run("parse big number", func(t *testing.T) {
+		want := 1234567890
+		raw := []byte(fmt.Sprintf("%d", want))
+		val, err := ParseUintBytes(raw)
+		if err != nil {
+			t.Errorf("failed to parse uint bytes: %s", err)
+		}
+		if val != want {
+			t.Errorf("expected value to be: %d, got: %d", want, val)
+		}
+	})
+	t.Run("no number should fail", func(t *testing.T) {
+		if _, err := ParseUintBytes([]byte("")); err == nil {
+			t.Errorf("parsing empty string should have failed, but it didn't")
+		}
+	})
+	t.Run("non-number should fail", func(t *testing.T) {
+		if _, err := ParseUintBytes([]byte("a")); err == nil {
+			t.Errorf("parsing a non-number string should have failed, but it didn't")
+		}
+	})
+}
+
+func TestLogMsg_AppName(t *testing.T) {
+	want := "app_name"
+	logMessage := LogMsg{
+		App: []byte(want),
+	}
+	if !strings.EqualFold(logMessage.AppName(), want) {
+		t.Errorf("expected app name to be: %s, got: %s", want, logMessage.AppName())
+	}
+}
+
+func TestLogMsg_Hostname(t *testing.T) {
+	want := "hostname"
+	logMessage := LogMsg{
+		Host: []byte(want),
+	}
+	if !strings.EqualFold(logMessage.Hostname(), want) {
+		t.Errorf("expected hostname to be: %s, got: %s", want, logMessage.Hostname())
+	}
+}
+
+func TestLogMsg_ProcID(t *testing.T) {
+	want := "proc_id"
+	logMessage := LogMsg{
+		PID: []byte(want),
+	}
+	if !strings.EqualFold(logMessage.ProcID(), want) {
+		t.Errorf("expected proc id to be: %s, got: %s", want, logMessage.ProcID())
+	}
+}
 
 // TestFacilityFromPrio tests the FacilityFromPrio method
 func TestFacilityFromPrio(t *testing.T) {
@@ -105,6 +175,7 @@ func TestFacilityStringFromPrio(t *testing.T) {
 		{"Local5/Notice", Local5 | Notice, "LOCAL5"},
 		{"Local6/Notice", Local6 | Notice, "LOCAL6"},
 		{"Local7/Notice", Local7 | Notice, "LOCAL7"},
+		{"Unknown", 194 | Notice, "UNKNOWN"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,4 +211,43 @@ func TestSeverityStringFromPrio(t *testing.T) {
 			}
 		})
 	}
+	t.Run("Unknown severity", func(t *testing.T) {
+		val := Severity(8)
+		if got := val.String(); got != "UNKNOWN" {
+			t.Errorf("FacilityStringFromPrio() = %s, want %s", got, "UNKNOWN")
+		}
+	})
+}
+
+func TestNew(t *testing.T) {
+	t.Run("new parser from a registered type", func(t *testing.T) {
+		pType := ParserType("example")
+		Register(pType, func() (Parser, error) {
+			return nil, nil
+		})
+		_, err := New(pType)
+		if err != nil {
+			t.Errorf("failed to create new parser: %s", err)
+		}
+	})
+	t.Run("new parser from an unregistered type", func(t *testing.T) {
+		pType := ParserType("non-existing")
+		_, err := New(pType)
+		if err == nil {
+			t.Errorf("expected error to be returned, but it didn't")
+		}
+	})
+	t.Run("new parser with double registered type", func(t *testing.T) {
+		pType := ParserType("example")
+		Register(pType, func() (Parser, error) {
+			return nil, nil
+		})
+		Register(pType, func() (Parser, error) {
+			return nil, nil
+		})
+		_, err := New(pType)
+		if err != nil {
+			t.Errorf("failed to create new parser: %s", err)
+		}
+	})
 }
