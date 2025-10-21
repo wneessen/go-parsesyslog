@@ -16,9 +16,10 @@ var (
 	// ErrParserTypeUnknown is returned if a Parser is requested via New() which is not registered
 	ErrParserTypeUnknown = errors.New("unknown parser type")
 	// ErrPrematureEOF should be used in case a log message ends before the provided length
-	ErrPrematureEOF = errors.New("log message is shorter than the provided length")
+	ErrPrematureEOF = errors.New("log message is shorter than the expected length")
 	// ErrWrongFormat should be used if a log messages does not comply with the logging format definitions
 	ErrWrongFormat = errors.New("log message does not conform the logging format")
 	// ErrWrongSDFormat should be used in case the structured data is not parsable
 	ErrWrongSDFormat = errors.New("structured data does not conform the format")
+	ErrInvalidLength = errors.New("log message does not match the provided length value")
 )

@@ -18,10 +18,18 @@ import (
 	"github.com/wneessen/go-parsesyslog"
 )
 
+const (
+	space = ' '
+	dash  = '-'
+)
+
 // rfc5424 represents a log message in that matches RFC5424
 type rfc5424 struct {
-	buf *bytes.Buffer
-	sds []parsesyslog.StructuredDataElement
+	buf    *bytes.Buffer
+	arena  []byte
+	offset int
+	len    int
+	sds    []parsesyslog.StructuredDataElement
 }
 
 // Type represents the ParserType for this Parser
@@ -31,8 +39,9 @@ const Type parsesyslog.ParserType = "rfc5424"
 func init() {
 	fn := func() (parsesyslog.Parser, error) {
 		return &rfc5424{
-			buf: bytes.NewBuffer(nil),
-			sds: make([]parsesyslog.StructuredDataElement, 0),
+			buf:   bytes.NewBuffer(nil),
+			arena: make([]byte, 0, 2048),
+			sds:   make([]parsesyslog.StructuredDataElement, 0),
 		}, nil
 	}
 	parsesyslog.Register(Type, fn)
@@ -48,40 +57,48 @@ func (r *rfc5424) ParseString(s string) (parsesyslog.LogMsg, error) {
 // ParseReader is the parser function that is able to interpret RFC5424 and
 // satisfies the Parser interface
 func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
+	r.offset, r.len = 0, 0
 	logMessage := parsesyslog.LogMsg{
 		Type: parsesyslog.RFC5424,
 	}
 
-	bufReader, ok := reader.(*bufio.Reader)
+	msgReader, ok := reader.(*bufio.Reader)
 	if !ok {
-		bufReader = bufio.NewReader(reader)
+		msgReader = bufio.NewReader(reader)
 	}
-	ml, err := parsesyslog.ReadMsgLength(bufReader)
+
+	// Consume the length information of the log message
+	wantLength, err := r.parseMessageLength(msgReader)
 	if err != nil {
 		return logMessage, err
 	}
-	msgReader := bufio.NewReader(io.LimitReader(bufReader, int64(ml)))
 
+	// Parse the log header and structured data
 	if err = r.parseHeader(msgReader, &logMessage); err != nil {
 		return logMessage, r.handleParseError(err)
 	}
-
 	if err = r.parseStructuredData(msgReader, &logMessage); err != nil {
 		return logMessage, r.handleParseError(err)
 	}
-
 	if err = r.parseBOM(msgReader, &logMessage); err != nil {
 		return logMessage, nil
 	}
 
-	// rb := make([]byte, ml - logMessage.Message.Len())
-	md, err := io.ReadAll(msgReader)
+	// Consume the rest of the message
+	md := make([]byte, wantLength-r.len)
+	read, err := io.ReadFull(msgReader, md)
 	if err != nil {
-		return logMessage, err
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return logMessage, parsesyslog.ErrPrematureEOF
+		}
+		return logMessage, fmt.Errorf("failed to read log message content: %w", err)
 	}
-
 	logMessage.Message.Write(md)
 	logMessage.MsgLength = logMessage.Message.Len()
+
+	if r.len+read != wantLength {
+		return logMessage, parsesyslog.ErrInvalidLength
+	}
 
 	return logMessage, nil
 }
@@ -160,6 +177,8 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 		// Found valid NILVALUE: "- ". We consumed the space, which is correct because
 		// the stream is now positioned at the start of the MSG body.
 		logMessage.StructuredData = nil
+		r.len = r.len + 2
+
 		return nil
 	}
 
@@ -171,7 +190,7 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 
 	var sdContent []byte
 	var inQuotes bool
-	var depth = 1
+	depth := 1
 
 	for {
 		data, err := reader.ReadByte()
@@ -220,6 +239,7 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 
 	// message now holds the contiguous slice of SD bytes read from the stream.
 	message := sdContent
+	r.len = r.len + len(message)
 
 	if len(message) < 2 || message[0] != '[' || message[len(message)-1] != ']' {
 		// We have a malformed SD block.
@@ -232,15 +252,35 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 
 	var sd parsesyslog.StructuredDataElement
 	var sdp parsesyslog.StructuredDataParam
-	var start = 1
+	start := 1
 	insideValue := false
 
 	for i := 1; i < len(message); i++ {
 		b := message[i]
 
+		// If we are inside a value a right bracket must be escaped.
+		if b == ']' && insideValue {
+			if len(message) >= i-2 {
+				if message[i-1] != '\\' && message[i-2] != '\\' {
+					return parsesyslog.ErrWrongSDFormat
+				}
+			}
+		}
+
 		if b == '"' {
 			switch insideValue {
 			case true:
+				// Escaped quotes are allowed inside values.
+				if len(message) >= i-1 && message[i-1] == '\\' {
+					r.len++
+					continue
+				}
+
+				// Parameters need a name and a value.
+				if len(sdp.Name) == 0 {
+					return parsesyslog.ErrWrongSDFormat
+				}
+
 				sdp.Value = message[start:i]
 				sd.Param = append(sd.Param, sdp)
 				sdp = parsesyslog.StructuredDataParam{}
@@ -267,7 +307,7 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 					}
 
 					r.sds = append(r.sds, sd)
-					sd = parsesyslog.StructuredDataElement{} // Reset for next element
+					sd = parsesyslog.StructuredDataElement{}
 					start = i + 1
 
 					// If content remains, it must be the start of a new element.
@@ -278,6 +318,9 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 					break
 				}
 
+				if sd.ID != nil && len(sd.Param) == 0 {
+					return parsesyslog.ErrWrongSDFormat
+				}
 				if sd.ID == nil {
 					sd.ID = message[start:i]
 					start = i + 1
@@ -291,6 +334,7 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 
 	logMessage.StructuredData = r.sds
 	_, err = reader.ReadByte()
+	r.len++
 	return err
 }
 
@@ -307,15 +351,26 @@ func (r *rfc5424) parseBOM(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	return nil
 }
 
+// parseMessageLength will try to parse the message length prefix of the log message
+func (r *rfc5424) parseMessageLength(reader *bufio.Reader) (int, error) {
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return 0, fmt.Errorf("failed to read hostname: %w", err)
+	}
+	val := r.sliceFrom(start)
+	return parsesyslog.ParseUintBytes(val)
+}
+
 // parseProtoVersion will try to parse the proto version part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.2
 func (r *rfc5424) parseProtoVersion(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	b, _, err := parsesyslog.ReadBytesUntilSpace(reader)
-	if err != nil {
-		return err
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return fmt.Errorf("failed to read hostname: %w", err)
 	}
-	pv, err := parsesyslog.ParseUintBytes(b)
-	if err != nil {
+	version := r.sliceFrom(start)
+	pv, err := parsesyslog.ParseUintBytes(version)
+	if err != nil || pv != 1 {
 		return parsesyslog.ErrInvalidProtoVersion
 	}
 	lm.ProtoVersion = parsesyslog.ProtoVersion(pv)
@@ -326,17 +381,17 @@ func (r *rfc5424) parseProtoVersion(reader *bufio.Reader, lm *parsesyslog.LogMsg
 // RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.3
 func (r *rfc5424) parseTimestamp(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
-	if err != nil {
-		return err
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return fmt.Errorf("failed to read hostname: %w", err)
 	}
-	if r.buf.Len() == 0 {
+	tsBytes := r.sliceFrom(start)
+	if len(tsBytes) == 0 || (len(tsBytes) == 1 && tsBytes[0] == dash) {
+		r.offset = start
+		r.len++
 		return nil
 	}
-	if r.buf.Bytes()[0] == '-' {
-		return nil
-	}
-	ts, err := time.Parse(time.RFC3339, r.buf.String())
+	ts, err := time.Parse(time.RFC3339, string(tsBytes))
 	if err != nil {
 		return parsesyslog.ErrInvalidTimestamp
 	}
@@ -347,67 +402,95 @@ func (r *rfc5424) parseTimestamp(reader *bufio.Reader, lm *parsesyslog.LogMsg) e
 // parseHostname will try to read the hostname part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.4
 func (r *rfc5424) parseHostname(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
-	if err != nil {
-		return err
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return fmt.Errorf("failed to read hostname: %w", err)
 	}
-	if r.buf.Len() == 0 {
+	host := r.sliceFrom(start)
+	if len(host) == 0 || (len(host) == 1 && host[0] == dash) {
+		r.offset = start
+		r.len++
 		return nil
 	}
-	if r.buf.Bytes()[0] == '-' {
-		return nil
-	}
-	lm.Host = r.buf.Bytes()
+	lm.Host = host
 	return nil
 }
 
 // parseAppName will try to read the app name part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.5
 func (r *rfc5424) parseAppName(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
-	if err != nil {
-		return err
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return fmt.Errorf("failed to read hostname: %w", err)
 	}
-	if r.buf.Len() == 0 {
+	app := r.sliceFrom(start)
+	if len(app) == 0 || (len(app) == 1 && app[0] == dash) {
+		r.offset = start
+		r.len++
 		return nil
 	}
-	if r.buf.Bytes()[0] == '-' {
-		return nil
-	}
-	lm.App = r.buf.Bytes()
+	lm.App = app
 	return nil
 }
 
 // parseProcID will try to read the process ID part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.6
 func (r *rfc5424) parseProcID(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
-	if err != nil {
-		return err
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return fmt.Errorf("failed to read hostname: %w", err)
 	}
-	if r.buf.Len() == 0 {
+	pid := r.sliceFrom(start)
+	if len(pid) == 0 || (len(pid) == 1 && pid[0] == dash) {
+		r.offset = start
+		r.len++
 		return nil
 	}
-	if r.buf.Bytes()[0] == '-' {
-		return nil
-	}
-	lm.PID = r.buf.Bytes()
+	lm.PID = pid
 	return nil
 }
 
 // parseMsgID will try to read the message ID part of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.7
 func (r *rfc5424) parseMsgID(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
-	_, err := parsesyslog.ReadBytesUntilSpaceOrNilValue(reader, r.buf)
-	if err != nil {
-		return err
+	start := r.offset
+	if err := r.readUntilSpace(reader); err != nil {
+		return fmt.Errorf("failed to read hostname: %w", err)
 	}
-	if r.buf.Len() == 0 {
+	msgid := r.sliceFrom(start)
+	if len(msgid) == 0 || (len(msgid) == 1 && msgid[0] == dash) {
+		r.offset = start
+		r.len++
 		return nil
 	}
-	if r.buf.Bytes()[0] == '-' {
-		return nil
+	lm.MsgID = msgid
+	return nil
+}
+
+func (r *rfc5424) sliceFrom(start int) []byte {
+	return r.arena[start:r.offset]
+}
+
+func (r *rfc5424) readUntilSpace(reader *bufio.Reader) error {
+	for {
+		p, err := reader.Peek(1)
+		if err != nil {
+			return err
+		}
+		c := p[0]
+		if c == space {
+			_, _ = reader.ReadByte()
+			r.len++
+			break
+		}
+		_, _ = reader.ReadByte()
+		if r.offset >= cap(r.arena) {
+			return parsesyslog.ErrWrongFormat
+		}
+		r.arena = r.arena[:r.offset+1]
+		r.arena[r.offset] = c
+		r.offset++
+		r.len++
 	}
-	lm.MsgID = r.buf.Bytes()
 	return nil
 }

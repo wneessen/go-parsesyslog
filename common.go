@@ -13,21 +13,9 @@ import (
 
 const (
 	space       = ' '
-	dash        = ' '
 	lowerThan   = '<'
 	greaterThan = '>'
 )
-
-// ReadMsgLength reads a space-delimited length prefix from the provided bufio.Reader, converts
-// it to an integer, and returns it.
-func ReadMsgLength(r *bufio.Reader) (int, error) {
-	length, _, err := ReadBytesUntilSpace(r)
-	if err != nil {
-		return 0, err
-	}
-
-	return ParseUintBytes(length)
-}
 
 // ReadBytesUntilSpace reads bytes from the provided bufio.Reader until the first space character (' ')
 // is encountered. It returns the bytes read (excluding the trailing space), the total number of bytes
@@ -38,37 +26,6 @@ func ReadBytesUntilSpace(reader *bufio.Reader) ([]byte, int, error) {
 		return buf, len(buf), err
 	}
 	return buf[:len(buf)-1], len(buf), nil
-}
-
-// ReadBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
-// it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
-// and an error if one occurred
-// isNilValuePattern checks if the current byte completes a NILVALUE pattern (" -")
-// NILVALUE is represented as a dash preceded by a space
-func isNilValuePattern(currentByte byte, buffer *bytes.Buffer) bool {
-	return currentByte == dash && buffer.Len() > 0 && buffer.Bytes()[buffer.Len()-1] == space
-}
-
-// ReadBytesUntilSpaceOrNilValue is a helper method that takes a io.Reader and reads all bytes until
-// it hits a Space character or the NILVALUE ("-"). It returns the read bytes, the amount of bytes read
-// and an error if one occurred
-func ReadBytesUntilSpaceOrNilValue(reader *bufio.Reader, buffer *bytes.Buffer) (int, error) {
-	buffer.Reset()
-	bytesRead := 0
-	for {
-		data, err := reader.ReadByte()
-		if err != nil {
-			return bytesRead, err
-		}
-		bytesRead++
-
-		isTerminator := data == space || isNilValuePattern(data, buffer)
-		if isTerminator {
-			return bytesRead, nil
-		}
-
-		buffer.WriteByte(data)
-	}
 }
 
 // ParsePriority will try to parse the priority part of the RFC3164 header
