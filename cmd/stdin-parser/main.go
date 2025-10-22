@@ -7,7 +7,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/wneessen/go-parsesyslog"
@@ -15,7 +17,12 @@ import (
 )
 
 func main() {
-	br := bufio.NewReader(os.Stdin)
+	log, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Printf("failed to read from stdin: %s", err)
+		os.Exit(1)
+	}
+	br := bufio.NewReaderSize(strings.NewReader(string(log)), len(log))
 	p, err := parsesyslog.New(rfc5424.Type)
 	if err != nil {
 		fmt.Printf("failed to create RFC5424 parser: %s", err)
@@ -23,10 +30,10 @@ func main() {
 	}
 	st := time.Now()
 	lm, err := p.ParseReader(br)
+	et := time.Since(st)
 	if err != nil {
 		panic(err)
 	}
-	et := time.Since(st)
 	fmt.Println("Log message details:")
 	fmt.Printf("+ Log format:         %s\n", lm.Type)
 	fmt.Println("+ Header:")
