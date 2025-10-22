@@ -22,4 +22,4 @@ comment:
   require_changes: true
 
 ignore:
-  - "cmd/stdin-parser"
+  - "cmd/stdin-parser/**"
