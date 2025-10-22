@@ -52,8 +52,8 @@ func main() {
 			pc := 0
 			for _, sp := range se.Param {
 				fmt.Printf("    + Param %d:               \n", pc)
-				fmt.Printf("      - Name:         %s\n", sp.Name)
-				fmt.Printf("      - Value:        %s\n", sp.Value)
+				fmt.Printf("      - Key:         %s\n", sp.Key)
+				fmt.Printf("      - Val:        %s\n", sp.Val)
 				pc++
 			}
 		}

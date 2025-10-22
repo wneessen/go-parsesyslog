@@ -82,7 +82,7 @@ func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 	if err = r.parseStructuredData(msgReader, &logMessage); err != nil {
 		return logMessage, r.handleParseError(err)
 	}
-	if err = r.parseBOM(msgReader, &logMessage); err != nil {
+	if err = r.checkForBOM(msgReader, &logMessage); err != nil {
 		return logMessage, nil
 	}
 
@@ -276,11 +276,11 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 				}
 
 				// Parameters need a name and a value.
-				if len(sdp.Name) == 0 {
+				if len(sdp.Key) == 0 {
 					return parsesyslog.ErrWrongSDFormat
 				}
 
-				sdp.Value = message[start:i]
+				sdp.Val = message[start:i]
 				sd.Param = append(sd.Param, sdp)
 				sdp = parsesyslog.StructuredDataParam{}
 				insideValue = false
@@ -294,7 +294,7 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 
 		if !insideValue {
 			if b == '=' {
-				sdp.Name = message[start:i]
+				sdp.Key = message[start:i]
 				start = i + 1
 				continue
 			}
@@ -337,9 +337,9 @@ func (r *rfc5424) parseStructuredData(reader *bufio.Reader, logMessage *parsesys
 	return err
 }
 
-// parseBOM will try to parse the BOM (if any) of the RFC54524 header
+// checkForBOM will try to parse the BOM (if any) of the RFC54524 header
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.4
-func (r *rfc5424) parseBOM(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
+func (r *rfc5424) checkForBOM(reader *bufio.Reader, lm *parsesyslog.LogMsg) error {
 	bom, err := reader.Peek(3)
 	if err != nil {
 		return err
