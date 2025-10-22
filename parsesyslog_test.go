@@ -76,6 +76,43 @@ func TestLogMsg_ProcID(t *testing.T) {
 	}
 }
 
+func TestStructuredDataElement_IDString(t *testing.T) {
+	want := "id@1234"
+	logMessage := LogMsg{
+		StructuredData: make([]StructuredDataElement, 0),
+	}
+	logMessage.StructuredData = append(logMessage.StructuredData, StructuredDataElement{
+		ID: []byte(want),
+	})
+	if !strings.EqualFold(logMessage.StructuredData[0].IDString(), want) {
+		t.Errorf("expected structured data ID to be: %s, got: %s", want, logMessage.StructuredData[0].IDString())
+	}
+}
+
+func TestStructuredDataElement_Params(t *testing.T) {
+	wantKey := "key1"
+	wantVal := "val1"
+	logMessage := LogMsg{
+		StructuredData: make([]StructuredDataElement, 0),
+	}
+	logMessage.StructuredData = append(logMessage.StructuredData, StructuredDataElement{
+		ID:    []byte("id@1234"),
+		Param: make([]StructuredDataParam, 0),
+	})
+	logMessage.StructuredData[0].Param = append(logMessage.StructuredData[0].Param, StructuredDataParam{
+		Key: []byte(wantKey),
+		Val: []byte(wantVal),
+	})
+	if !strings.EqualFold(logMessage.StructuredData[0].Param[0].Name(), wantKey) {
+		t.Errorf("expected structured data param name to be: %s, got: %s", wantKey,
+			logMessage.StructuredData[0].Param[0].Name())
+	}
+	if !strings.EqualFold(logMessage.StructuredData[0].Param[0].Value(), wantVal) {
+		t.Errorf("expected structured data param name to be: %s, got: %s", wantVal,
+			logMessage.StructuredData[0].Param[0].Value())
+	}
+}
+
 // TestFacilityFromPrio tests the FacilityFromPrio method
 func TestFacilityFromPrio(t *testing.T) {
 	tests := []struct {

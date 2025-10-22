@@ -18,45 +18,36 @@ import (
 
 var (
 	valid = []string{
-		// Classic full example
 		`151 <34>1 2025-10-21T15:30:00Z mymachine app 12345 ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"] An application event log entry`,
-
-		// NIL SD, IPv4 host, BOM-prefixed message (BOM = 3 bytes)
 		`83 <165>1 2003-10-11T22:14:15.003Z 192.0.2.1 evntslog - ID47 - ` + string([]byte{0xEF, 0xBB, 0xBF}) + `BOM-prefixed message`,
-
-		// Multiple SD elements + tz offset + microseconds
 		`120 <165>1 2003-08-24T05:14:15.000003-07:00 myhost su - ID47 [meta@123 foo="bar"][example@9999 a="b" c="d"] multi-SD message`,
-
-		// NIL timestamp/host/app/proc/msgid but with SD and MSG
 		`34 <14>1 - - - - - [id@1 k="v"] hello`,
-
-		// Escaped quotes, backslash, and closing bracket inside SD param
 		`99 <190>1 2024-12-31T23:59:59Z host app 111 msg42 [x@999 q="quote: \" backslash: \\ bracket: \"]"] end`,
-
-		// Minimal header + single SD + short MSG
 		`46 <0>1 2020-01-01T00:00:00Z h a p m [id k="v"] m`,
-
-		// Dash for SD, non-empty message
 		`72 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
+		`37 <34>1 2025-10-21T15:30:00Z h a p m -`,
 	}
 
 	invalid = []string{
-		`XX <34>1 2025-10-21T15:30:00Z h a p m - bad`, // Missing space separator
+		`XX <34>1 2025-10-21T15:30:00Z h a p m - bad`,
 		`39<34>1 2025-10-21T15:30:00Z h a p m - bad`,
-		`39 34>1 2025-10-21T15:30:00Z h a p m - bad`,                     // missing '<'
-		`38 <>1 2025-10-21T15:30:00Z h a p m - bad`,                      // empty PRI
-		`40 <3x>1 2025-10-21T15:30:00Z h a p m - bad`,                    // non-digit in PRI
-		`39 <34> 2025-10-21T15:30:00Z h a p m - bad`,                     // missing VERSION
-		`40 <34>0 2025-10-21T15:30:00Z h a p m - bad`,                    // version 0
-		`40 <34>1 2025-13-01T00:00:00Z h a p m - bad`,                    // bad timestamp
-		`40 <34>1 2025-10-21 15:30:00Z h a p m - bad`,                    // no 'T'
-		`39 <34>1 2025-10-21T15:30:00Z h a p m- bad`,                     // missing SP
-		`59 <34>1 2025-10-21T15:30:00Z h a p m [id k="oops ] here"] bad`, // unescaped ']'
-		`53 <34>1 2025-10-21T15:30:00Z h a p m [bad id k="v"] bad`,       // space in SD-ID
-		`48 <34>1 2025-10-21T15:30:00Z h a p m [id k="v" bad`,            // unclosed SD
-		`46 <34>1 2025-10-21T15:30:00Z h a p m [v="]"]] bad`,             // unopened SD
-		`48 <34>1 2025-10-21T15:30:00Z h a p m [id ="v"] bad`,            // empty param name
-		`35 <14>1 - - - - - [id@1 k="v"] hello`,                          // message too short
+		`39 34>1 2025-10-21T15:30:00Z h a p m - bad`,
+		`38 <>1 2025-10-21T15:30:00Z h a p m - bad`,
+		`40 <3x>1 2025-10-21T15:30:00Z h a p m - bad`,
+		`39 <34> 2025-10-21T15:30:00Z h a p m - bad`,
+		`40 <34>0 2025-10-21T15:30:00Z h a p m - bad`,
+		`40 <34>1 2025-13-01T00:00:00Z h a p m - bad`,
+		`40 <34>1 2025-10-21 15:30:00Z h a p m - bad`,
+		`39 <34>1 2025-10-21T15:30:00Z h a p m- bad`,
+		`59 <34>1 2025-10-21T15:30:00Z h a p m [id k="oops ] here"] bad`,
+		`53 <34>1 2025-10-21T15:30:00Z h a p m [bad id k="v"] bad`,
+		`48 <34>1 2025-10-21T15:30:00Z h a p m [id k="v" bad`,
+		`46 <34>1 2025-10-21T15:30:00Z h a p m [v="]"]] bad`,
+		`48 <34>1 2025-10-21T15:30:00Z h a p m [id ="v"] bad`,
+		`35 <14>1 - - - - - [id@1 k="v"] hello`,
+		`38 <34>1 2025-10-21T15:30:00Z h a p m -.`,
+		`71 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
+		`73 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
 	}
 )
 
@@ -155,6 +146,9 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		if !strings.EqualFold(logMessage.Message.String(), expectMsg) {
 			t.Errorf("expected message to be: %q, got: %q", expectMsg, logMessage.Message.String())
 		}
+		if logMessage.MsgLength != len(expectMsg) {
+			t.Errorf("expected message length to be: %d, got: %d", len(expectMsg), logMessage.MsgLength)
+		}
 
 		// mymachine app 12345 ID47
 		expectApp := "app"
@@ -169,22 +163,68 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		if !strings.EqualFold(logMessage.ProcID(), expectProc) {
 			t.Errorf("expected proc id to be: %q, got: %q", expectProc, logMessage.ProcID())
 		}
-
 		expectMsgID := []byte("ID47")
 		if !bytes.Equal(logMessage.MsgID, expectMsgID) {
 			t.Errorf("expected proc id to be: %q, got: %q", expectMsgID, logMessage.MsgID)
 		}
+
+		if logMessage.StructuredData == nil {
+			t.Fatalf("expected structured data to be set")
+		}
+		if len(logMessage.StructuredData) != 1 {
+			t.Fatalf("expected structured data to have 1 element, got: %d", len(logMessage.StructuredData))
+		}
+		if len(logMessage.StructuredData[0].Param) != 3 {
+			t.Fatalf("expected structured data to have 3 elements, got: %d",
+				len(logMessage.StructuredData[0].Param))
+		}
+
+		expectSDID := []byte("exampleSDID@32473")
+		if !bytes.Equal(logMessage.StructuredData[0].ID, expectSDID) {
+			t.Errorf("expected structured data ID to be: %q, got: %q", expectSDID,
+				logMessage.StructuredData[0].ID)
+		}
+		expectSDParam := map[string]string{
+			"iut":         "3",
+			"eventSource": "Application",
+			"eventID":     "1011",
+		}
+		found := 0
+		for _, p := range logMessage.StructuredData[0].Param {
+			if _, ok := expectSDParam[string(p.Key)]; ok {
+				if !bytes.Equal(p.Val, []byte(expectSDParam[string(p.Key)])) {
+					t.Errorf("expected param %q to be: %q, got: %q", p.Key, string(p.Val),
+						expectSDParam[string(p.Key)])
+				}
+				found++
+				continue
+			}
+			t.Errorf("unexpected param: %q", p.Key)
+		}
+		if found != len(expectSDParam) {
+			t.Errorf("expected %d params, got: %d", len(expectSDParam), found)
+		}
 	})
 }
 
-func TestRfc5424_parseBOM(t *testing.T) {
-	t.Run("parsing BOM with broken reader should fail", func(t *testing.T) {
+func TestRfc5424_checkForBOM(t *testing.T) {
+	t.Run("checking for BOM with broken reader should fail", func(t *testing.T) {
 		reader := failReader{}
 		brokenReader := bufio.NewReader(reader)
 		parser := testRFC5424Parser(t)
 		logMessage := &parsesyslog.LogMsg{}
 
-		if err := parser.parseBOM(brokenReader, logMessage); err == nil {
+		if err := parser.checkForBOM(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("checking for BOM with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.checkForBOM(brokenReader, logMessage); err == nil {
 			t.Errorf("expected error to be returned, but it was nil")
 		}
 	})
@@ -200,11 +240,30 @@ func TestRfc5424_parseMessageLength(t *testing.T) {
 			t.Errorf("expected error to be returned, but it was nil")
 		}
 	})
+	t.Run("parsing length with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+
+		if _, err := parser.parseMessageLength(brokenReader); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
 }
 
 func TestRfc5424_parsePriority(t *testing.T) {
 	t.Run("parsing priority with broken reader should fail", func(t *testing.T) {
 		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parsePriority(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing priority with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
 		brokenReader := bufio.NewReader(reader)
 		parser := testRFC5424Parser(t)
 		logMessage := &parsesyslog.LogMsg{}
@@ -239,6 +298,16 @@ func TestRfc5424_parseProtoVersion(t *testing.T) {
 			t.Errorf("expected error to be returned, but it was nil")
 		}
 	})
+	t.Run("parsing protocol version with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseProtoVersion(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
 	t.Run("parsing protocol version with invalid value should fail", func(t *testing.T) {
 		reader := bufio.NewReader(strings.NewReader("0 "))
 		parser := testRFC5424Parser(t)
@@ -257,6 +326,16 @@ func TestRfc5424_parseProtoVersion(t *testing.T) {
 func TestRfc5424_parseTimestamp(t *testing.T) {
 	t.Run("parsing timestamp with broken reader should fail", func(t *testing.T) {
 		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseTimestamp(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing timestamp with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
 		brokenReader := bufio.NewReader(reader)
 		parser := testRFC5424Parser(t)
 		logMessage := &parsesyslog.LogMsg{}
@@ -291,11 +370,31 @@ func TestRfc5424_parseHostname(t *testing.T) {
 			t.Errorf("expected error to be returned, but it was nil")
 		}
 	})
+	t.Run("parsing hostname with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseHostname(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
 }
 
 func TestRfc5424_parseAppName(t *testing.T) {
 	t.Run("parsing app name with broken reader should fail", func(t *testing.T) {
 		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseAppName(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing app name with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
 		brokenReader := bufio.NewReader(reader)
 		parser := testRFC5424Parser(t)
 		logMessage := &parsesyslog.LogMsg{}
@@ -317,11 +416,31 @@ func TestRfc5424_parseProcID(t *testing.T) {
 			t.Errorf("expected error to be returned, but it was nil")
 		}
 	})
+	t.Run("parsing proc ID with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseProcID(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
 }
 
 func TestRfc5424_parseMsgID(t *testing.T) {
 	t.Run("parsing message ID with broken reader should fail", func(t *testing.T) {
 		reader := failReader{}
+		brokenReader := bufio.NewReader(reader)
+		parser := testRFC5424Parser(t)
+		logMessage := &parsesyslog.LogMsg{}
+
+		if err := parser.parseMsgID(brokenReader, logMessage); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+	t.Run("parsing message ID with EOF reader should fail", func(t *testing.T) {
+		reader := eofReader{}
 		brokenReader := bufio.NewReader(reader)
 		parser := testRFC5424Parser(t)
 		logMessage := &parsesyslog.LogMsg{}
@@ -372,4 +491,12 @@ type failReader struct{}
 // Read returns an error on every call. It satisfies the io.Reader interface.
 func (f failReader) Read([]byte) (n int, err error) {
 	return 0, errors.New("intentionally failing")
+}
+
+// eofReader is a reader that always returns io.EOF
+type eofReader struct{}
+
+// Read returns an error on every call. It satisfies the io.Reader interface.
+func (e eofReader) Read([]byte) (n int, err error) {
+	return 0, io.EOF
 }

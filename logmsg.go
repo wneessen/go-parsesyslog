@@ -51,18 +51,36 @@ type StructuredDataElement struct {
 // StructuredDataParam represents a key-value pair within a Structured Data element of an RFC5424 Syslog message.
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3.3
 type StructuredDataParam struct {
-	Name  []byte
-	Value []byte
+	Key []byte
+	Val []byte
 }
 
+// Hostname returns the hostname extracted from the LogMsg. It converts the Host field from []byte to string.
 func (l *LogMsg) Hostname() string {
 	return string(l.Host)
 }
 
+// AppName returns the application name extracted from the LogMsg. It converts the App field from []byte to string.
 func (l *LogMsg) AppName() string {
 	return string(l.App)
 }
 
+// ProcID returns the process ID extracted from the LogMsg. It converts the PID field from []byte to string.
 func (l *LogMsg) ProcID() string {
 	return string(l.PID)
+}
+
+// IDString returns the ID of the StructuredDataElement as a string.
+func (s *StructuredDataElement) IDString() string {
+	return string(s.ID)
+}
+
+// Name returns the key of the StructuredDataParam as a string.
+func (s *StructuredDataParam) Name() string {
+	return string(s.Key)
+}
+
+// Value returns the value of the StructuredDataParam as a string.
+func (s *StructuredDataParam) Value() string {
+	return string(s.Val)
 }
