@@ -155,6 +155,9 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		if !strings.EqualFold(logMessage.Message.String(), expectMsg) {
 			t.Errorf("expected message to be: %q, got: %q", expectMsg, logMessage.Message.String())
 		}
+		if logMessage.MsgLength != len(expectMsg) {
+			t.Errorf("expected message length to be: %d, got: %d", len(expectMsg), logMessage.MsgLength)
+		}
 
 		// mymachine app 12345 ID47
 		expectApp := "app"
@@ -169,10 +172,46 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		if !strings.EqualFold(logMessage.ProcID(), expectProc) {
 			t.Errorf("expected proc id to be: %q, got: %q", expectProc, logMessage.ProcID())
 		}
-
 		expectMsgID := []byte("ID47")
 		if !bytes.Equal(logMessage.MsgID, expectMsgID) {
 			t.Errorf("expected proc id to be: %q, got: %q", expectMsgID, logMessage.MsgID)
+		}
+
+		if logMessage.StructuredData == nil {
+			t.Fatalf("expected structured data to be set")
+		}
+		if len(logMessage.StructuredData) != 1 {
+			t.Fatalf("expected structured data to have 1 element, got: %d", len(logMessage.StructuredData))
+		}
+		if len(logMessage.StructuredData[0].Param) != 3 {
+			t.Fatalf("expected structured data to have 3 elements, got: %d",
+				len(logMessage.StructuredData[0].Param))
+		}
+
+		expectSDID := []byte("exampleSDID@32473")
+		if !bytes.Equal(logMessage.StructuredData[0].ID, expectSDID) {
+			t.Errorf("expected structured data ID to be: %q, got: %q", expectSDID,
+				logMessage.StructuredData[0].ID)
+		}
+		expectSDParam := map[string]string{
+			"iut":         "3",
+			"eventSource": "Application",
+			"eventID":     "1011",
+		}
+		found := 0
+		for _, p := range logMessage.StructuredData[0].Param {
+			if _, ok := expectSDParam[string(p.Name)]; ok {
+				if !bytes.Equal(p.Value, []byte(expectSDParam[string(p.Name)])) {
+					t.Errorf("expected param %q to be: %q, got: %q", p.Name, string(p.Value),
+						expectSDParam[string(p.Name)])
+				}
+				found++
+				continue
+			}
+			t.Errorf("unexpected param: %q", p.Name)
+		}
+		if found != len(expectSDParam) {
+			t.Errorf("expected %d params, got: %d", len(expectSDParam), found)
 		}
 	})
 }
