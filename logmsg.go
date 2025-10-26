@@ -9,13 +9,6 @@ import (
 	"time"
 )
 
-const (
-	// RFC3164 represents the legacy BSD-syslog message type.
-	RFC3164 LogMsgType = "RFC3164"
-	// RFC5424 represents the modern IETF-syslog message type.
-	RFC5424 LogMsgType = "RFC5424"
-)
-
 // LogMsg represents a Syslog message containing metadata and parsed log content based on RFC specifications.
 type LogMsg struct {
 	App            []byte
