@@ -8,13 +8,13 @@ package parsesyslog
 const SeverityMask = 0x07
 
 // Severity represents the serverity part of the Syslog PRI header
-type Severity int
+type Severity uint8
 
 // Facility represents the facility part of the Syslog PRI header
-type Facility int
+type Facility uint8
 
 // Priority represents the Syslog PRI header
-type Priority int
+type Priority uint8
 
 // Severities
 const (

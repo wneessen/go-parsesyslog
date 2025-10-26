@@ -98,7 +98,7 @@ func (r *rfc3164) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 			return logMessage, fmt.Errorf("failed to write bytes: %w", err)
 		}
 	}
-	logMessage.MsgLength = logMessage.Message.Len()
+	logMessage.MsgLength = int32(logMessage.Message.Len())
 
 	return logMessage, nil
 }

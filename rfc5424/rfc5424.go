@@ -99,7 +99,7 @@ func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 		return logMessage, fmt.Errorf("failed to read log message content: %w", err)
 	}
 	logMessage.Message.Write(md)
-	logMessage.MsgLength = logMessage.Message.Len()
+	logMessage.MsgLength = int32(logMessage.Message.Len())
 
 	if msgReader.Buffered() != 0 {
 		return logMessage, parsesyslog.ErrInvalidLength
