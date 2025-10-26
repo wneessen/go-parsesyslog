@@ -34,8 +34,12 @@ type rfc5424 struct {
 	sds    []parsesyslog.StructuredDataElement
 }
 
-// Type represents the ParserType for this Parser
-const Type parsesyslog.ParserType = "rfc5424"
+const (
+	// Type represents the ParserType for this parser
+	Type parsesyslog.ParserType = "rfc5424"
+	// MsgType represents the log message type of this parser
+	MsgType parsesyslog.LogMsgType = "RFC3164"
+)
 
 // init registers the Parser
 func init() {
@@ -61,7 +65,7 @@ func (r *rfc5424) ParseString(s string) (parsesyslog.LogMsg, error) {
 func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 	r.offset, r.len = 0, 0
 	logMessage := parsesyslog.LogMsg{
-		Type: parsesyslog.RFC5424,
+		Type: MsgType,
 	}
 
 	msgReader, ok := reader.(*bufio.Reader)
@@ -95,7 +99,7 @@ func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 		return logMessage, fmt.Errorf("failed to read log message content: %w", err)
 	}
 	logMessage.Message.Write(md)
-	logMessage.MsgLength = logMessage.Message.Len()
+	logMessage.MsgLength = int32(logMessage.Message.Len())
 
 	if msgReader.Buffered() != 0 {
 		return logMessage, parsesyslog.ErrInvalidLength

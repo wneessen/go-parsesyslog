@@ -146,7 +146,7 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		if !strings.EqualFold(logMessage.Message.String(), expectMsg) {
 			t.Errorf("expected message to be: %q, got: %q", expectMsg, logMessage.Message.String())
 		}
-		if logMessage.MsgLength != len(expectMsg) {
+		if logMessage.MsgLength != int32(len(expectMsg)) {
 			t.Errorf("expected message length to be: %d, got: %d", len(expectMsg), logMessage.MsgLength)
 		}
 

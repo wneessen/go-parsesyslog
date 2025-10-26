@@ -9,29 +9,28 @@ import (
 	"time"
 )
 
-const (
-	// RFC3164 represents the legacy BSD-syslog message type.
-	RFC3164 LogMsgType = "RFC3164"
-	// RFC5424 represents the modern IETF-syslog message type.
-	RFC5424 LogMsgType = "RFC5424"
-)
-
-// LogMsg represents a Syslog message containing metadata and parsed log content based on RFC specifications.
+// LogMsg represents a Syslog message as defined by the Parser, with fields for structured and
+// unstructured data
 type LogMsg struct {
-	App            []byte
-	Facility       Facility
-	HasBOM         bool
-	Host           []byte
+	// Wide and/or bulky types first
 	Message        bytes.Buffer
-	MsgLength      int
-	MsgID          []byte
-	Priority       Priority
-	PID            []byte
-	ProtoVersion   ProtoVersion
-	Severity       Severity
-	StructuredData []StructuredDataElement
 	Timestamp      time.Time
-	Type           LogMsgType
+	App            []byte
+	Host           []byte
+	MsgID          []byte
+	PID            []byte
+	StructuredData []StructuredDataElement
+
+	// Medium size types
+	Type LogMsgType
+
+	MsgLength    int32
+	Facility     Facility
+	Priority     Priority
+	ProtoVersion ProtoVersion
+	Severity     Severity
+	HasBOM       bool
+	_            [2]byte
 }
 
 // LogMsgType represents the type of a Syslog message, typically defined by RFC specifications such as
@@ -39,7 +38,7 @@ type LogMsg struct {
 type LogMsgType string
 
 // ProtoVersion represents the version of the Syslog protocol as defined in RFC5424.
-type ProtoVersion int
+type ProtoVersion uint8
 
 // StructuredDataElement represents a structured data element in an RFC5424 Syslog message.
 // See: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3.1

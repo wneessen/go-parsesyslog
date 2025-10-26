@@ -28,6 +28,8 @@ type rfc3164 struct {
 const (
 	// Type represents the ParserType for this Parser
 	Type parsesyslog.ParserType = "rfc3164"
+	// MsgType represents the log message type of this package
+	MsgType parsesyslog.LogMsgType = "RFC3164"
 )
 
 const (
@@ -68,7 +70,7 @@ func (r *rfc3164) ParseString(message string) (parsesyslog.LogMsg, error) {
 // ParseReader parses syslog messages from an io.Reader according to RFC3164 and returns a LogMsg or an error.
 func (r *rfc3164) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 	logMessage := parsesyslog.LogMsg{
-		Type: parsesyslog.RFC3164,
+		Type: MsgType,
 	}
 	r.reol = false
 
@@ -96,7 +98,7 @@ func (r *rfc3164) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 			return logMessage, fmt.Errorf("failed to write bytes: %w", err)
 		}
 	}
-	logMessage.MsgLength = logMessage.Message.Len()
+	logMessage.MsgLength = int32(logMessage.Message.Len())
 
 	return logMessage, nil
 }
