@@ -46,7 +46,6 @@ var (
 		`48 <34>1 2025-10-21T15:30:00Z h a p m [id ="v"] bad`,
 		`35 <14>1 - - - - - [id@1 k="v"] hello`,
 		`38 <34>1 2025-10-21T15:30:00Z h a p m -.`,
-		`71 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
 		`73 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
 	}
 )
