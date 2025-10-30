@@ -92,16 +92,18 @@ func (r *rfc5424) ParseReader(reader io.Reader) (parsesyslog.LogMsg, error) {
 
 	// Consume the rest of the message
 	md := make([]byte, wantLength-r.len)
-	if _, err = io.ReadFull(msgReader, md); err != nil {
+	read, err := io.ReadFull(msgReader, md)
+	if err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
 			return logMessage, parsesyslog.ErrPrematureEOF
 		}
 		return logMessage, fmt.Errorf("failed to read log message content: %w", err)
 	}
+	r.len += read
 	logMessage.Message.Write(md)
 	logMessage.MsgLength = int32(logMessage.Message.Len())
 
-	if msgReader.Buffered() != 0 {
+	if r.len != wantLength {
 		return logMessage, parsesyslog.ErrInvalidLength
 	}
 

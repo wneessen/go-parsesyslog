@@ -46,7 +46,6 @@ var (
 		`48 <34>1 2025-10-21T15:30:00Z h a p m [id ="v"] bad`,
 		`35 <14>1 - - - - - [id@1 k="v"] hello`,
 		`38 <34>1 2025-10-21T15:30:00Z h a p m -.`,
-		`71 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
 		`73 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`,
 	}
 )
@@ -134,6 +133,22 @@ func TestRfc5424_ParseReader(t *testing.T) {
 					t.Errorf("log message %q should have caused an error, but it didn't", tc.input)
 				}
 			})
+		}
+	})
+
+	t.Run("parsing a too short message should fail", func(t *testing.T) {
+		message := `73 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`
+		sr := strings.NewReader(message)
+		if _, err := parser.ParseReader(sr); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+
+	t.Run("parsing multiple messages in a buffer should succeed", func(t *testing.T) {
+		message := `72 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`
+		sr := strings.NewReader(strings.Repeat(message, 100))
+		if _, err := parser.ParseReader(sr); err != nil {
+			t.Errorf("failed to parse log message: %s", err)
 		}
 	})
 
