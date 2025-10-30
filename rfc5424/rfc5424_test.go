@@ -136,6 +136,14 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		}
 	})
 
+	t.Run("parsing a too short message should fail", func(t *testing.T) {
+		message := `73 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`
+		sr := strings.NewReader(message)
+		if _, err := parser.ParseReader(sr); err == nil {
+			t.Errorf("expected error to be returned, but it was nil")
+		}
+	})
+
 	t.Run("parsing valid message should provide the correct values", func(t *testing.T) {
 		logMessage, err := parser.ParseReader(strings.NewReader(valid[0]))
 		if err != nil {
