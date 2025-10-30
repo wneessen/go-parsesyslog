@@ -144,6 +144,14 @@ func TestRfc5424_ParseReader(t *testing.T) {
 		}
 	})
 
+	t.Run("parsing multiple messages in a buffer should succeed", func(t *testing.T) {
+		message := `72 <13>1 2022-06-01T12:00:00+02:00 host app - mid - No structured data here`
+		sr := strings.NewReader(strings.Repeat(message, 100))
+		if _, err := parser.ParseReader(sr); err != nil {
+			t.Errorf("failed to parse log message: %s", err)
+		}
+	})
+
 	t.Run("parsing valid message should provide the correct values", func(t *testing.T) {
 		logMessage, err := parser.ParseReader(strings.NewReader(valid[0]))
 		if err != nil {
